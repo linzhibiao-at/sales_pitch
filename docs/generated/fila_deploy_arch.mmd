@@ -1,0 +1,22 @@
+graph TB
+    subgraph 客户端
+        Browser[浏览器]
+    end
+
+    subgraph FastAPI 单进程服务
+        UVicorn[uvicorn 应用服务]
+        API[REST / SSE API<br/>对话推荐 / 单品互补 / 搭配召回 / 数据查询]
+    end
+
+    subgraph 外部服务
+        ES_Cluster[Elasticsearch 集群]
+        Milvus_Cloud[阿里云托管 Milvus]
+        LLM_Gateway[LLM Gateway]
+    end
+
+    Browser -->|HTTP| UVicorn
+    UVicorn --> API
+
+    API -->|ES REST| ES_Cluster
+    API -->|gRPC| Milvus_Cloud
+    API -->|OpenAI Compatible| LLM_Gateway

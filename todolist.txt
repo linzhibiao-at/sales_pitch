@@ -1,0 +1,11 @@
+category: "上衣" | "连衣裙" | "裤子" | ...
+style: ["简约","复古","街头","优雅",...]
+color: ["黑","白","红","蓝",...], color_secondary
+pattern: ["纯色","条纹","格子","印花","渐变","花朵",...]
+silhouette: ["修身","宽松","A字","直筒",...]
+sleeve: ["短袖","无袖","七分","长袖",...]
+length: ["短款","中长","长款"]
+fabric: ["棉","丝绸","针织","牛仔",...]
+occasion: ["日常","职场","约会","晚宴","运动"]
+attributes_confidence: per-field confidence
+user_constraints: freeform or normalized (e.g., {"avoid":"花哨","prefer":"舒适"})

@@ -1,0 +1,78 @@
+{
+  "intent": {
+    "query_type": "text_only",
+    "text": "推荐一套黑色的衣服",
+    "image_base64": null,
+    "anchor_role": null,
+    "target_roles": [],
+    "gender": null,
+    "age": null,
+    "season": [
+      "夏"
+    ],
+    "occasion_tags": [],
+    "style_tags": [],
+    "color": [],
+    "color_series": [],
+    "category": [],
+    "length_class": "n/a",
+    "coverage": "n/a",
+    "scene_domain": "",
+    "series": null,
+    "modeling": null,
+    "budget_max": null,
+    "budget_min": null,
+    "target_slots": {}
+  },
+  "intent_method": "none",
+  "intent_confidence": 0.0,
+  "anchor": null,
+  "outfits": {
+    "outfits": []
+  },
+  "recall_timings": {
+    "image_vector": {
+      "elapsed_ms": 7,
+      "count": 0,
+      "unit": "outfits"
+    },
+    "query2es": {
+      "elapsed_ms": 7,
+      "count": 0,
+      "unit": "skus"
+    },
+    "complementary_model": {
+      "elapsed_ms": 7,
+      "count": 0,
+      "unit": "skus"
+    },
+    "text_vector": {
+      "elapsed_ms": 9,
+      "count": 0,
+      "unit": "skus"
+    }
+  },
+  "timings": {
+    "chat_begin": 0,
+    "embedding_query": 2,
+    "intent_extract": 3,
+    "milvus_recall": 2,
+    "multi_path_recall": 18,
+    "outfit_dedupe": 9,
+    "coarse_rank": 11,
+    "outfit_ranking": 2,
+    "rank_truncate": 1,
+    "reason_llm": 0,
+    "tryon": 0,
+    "response_build": 8
+  },
+  "total_ms": 65,
+  "recall_pathways": {
+    "anchor": "ANCHOR_NONE",
+    "outfit": "OUTFIT_TEXT_ES"
+  },
+  "recall_pathway_labels": {
+    "anchor": "锚点-无",
+    "outfit": "套装-文本/本地检索"
+  }
+}

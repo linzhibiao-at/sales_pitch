@@ -1,0 +1,63 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #121418;
+  color: #e8eaef;
+}
+
+.top {
+  padding: 1rem 1.5rem;
+  background: #1a1d24;
+  border-bottom: 1px solid #2a2f3a;
+}
+
+.top h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.search {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #3a4252;
+  background: #121418;
+  color: #e8eaef;
+}
+
+.search button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: #fff;
+  cursor: pointer;
+}
+
+main {
+  padding: 1rem 1.5rem;
+}
+
+.hint {
+  color: #9aa3b5;
+  font-size: 0.9rem;
+}
+
+#json-out {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.8rem;
+  background: #1a1d24;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #2a2f3a;
+}
+
+code {
+  color: #7dd3fc;
+}

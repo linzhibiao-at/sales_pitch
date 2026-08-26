@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FILA 搭配评测 · Review</title>
+    <link rel="stylesheet" href="review_styles.css" />
+    <script>
+      (function () {
+        var saved = localStorage.getItem('fila_eval_theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.dataset.theme = saved;
+        } else {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>FILA 搭配评测</h1>
+        <p class="subtitle" id="pageSubtitle">按中类(category_l2)分组展示搭配推荐结果 · 人工 Review</p>
+      </div>
+      <nav class="header-actions">
+        <button id="roleBadge" type="button" class="role-badge" title="点击切换评审角色" hidden></button>
+        <button id="btnTheme" type="button" class="btn theme-toggle"
+          aria-label="切换白天/黑夜模式" title="切换白天/黑夜模式">
+          <span class="theme-icon theme-icon-sun" aria-hidden="true">&#9728;</span>
+          <span class="theme-icon theme-icon-moon" aria-hidden="true">&#9789;</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- 角色选择弹窗（拦截式） -->
+    <div id="roleGate" class="role-gate-modal hidden" role="dialog" aria-modal="true" aria-labelledby="roleGateTitle">
+      <div class="role-gate-card">
+        <h2 id="roleGateTitle">选择你的评审角色</h2>
+        <p class="role-gate-hint">提交的评审意见会打上角色标签，每套搭配支持多人多次评审</p>
+        <div class="role-gate-options" id="roleGateOptions">
+          <button type="button" class="role-option" data-role="产品经理">产品经理</button>
+          <button type="button" class="role-option" data-role="设计师">设计师</button>
+          <button type="button" class="role-option" data-role="项目经理">项目经理</button>
+          <button type="button" class="role-option" data-role="工程师">工程师</button>
+          <button type="button" class="role-option" data-role="其他">其他</button>
+        </div>
+        <label class="role-gate-name-label">
+          姓名 / 工号（可选）
+          <input type="text" id="roleGateName" class="role-gate-name" placeholder="便于区分同一角色的不同人" />
+        </label>
+        <button type="button" id="roleGateEnter" class="role-gate-enter" disabled>进入评测</button>
+      </div>
+    </div>
+
+    <main class="layout">
+      <!-- 评测概要 -->
+      <section class="panel panel-wide summary-panel">
+        <h2>评测概要</h2>
+        <div id="summaryContent" class="summary-content">加载中...</div>
+      </section>
+
+      <!-- 中类导航（ts 模式） -->
+      <section class="panel panel-wide" id="panelTop">
+        <h2>上装</h2>
+        <div id="linksTop" class="cat-links"></div>
+      </section>
+      <section class="panel panel-wide" id="panelBottom">
+        <h2>下装</h2>
+        <div id="linksBottom" class="cat-links"></div>
+      </section>
+      <section class="panel panel-wide" id="panelShoes">
+        <h2>鞋</h2>
+        <div id="linksShoes" class="cat-links"></div>
+      </section>
+
+      <!-- 历史评测列表（无 ts 模式） -->
+      <section class="panel panel-wide" id="panelRuns" style="display:none">
+        <h2>历史评测</h2>
+        <div id="runsList" class="runs-list"></div>
+      </section>
+    </main>
+
+    <script src="review_app.js" type="module"></script>
+  </body>
+</html>

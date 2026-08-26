@@ -1,0 +1,452 @@
+# FILA 穿搭推荐 — 路径相对本文件所在目录（fila_agent_html/）
+
+# 前端模式：debug（完整调试台）| presentation（对外展示，精简 UI）
+ui_mode: "debug"
+
+# 对外接口 API Key 鉴权 + 限流排队（docs/FILA接口鉴权与限流方案.md）
+# 限流为进程内实现(不引 Redis), 8 worker 下为单进程近似。
+auth:
+  enabled: true               # 鉴权总开关(上线灰度时改 true)
+  header_name: "X-API-Key"
+  keys_file: "config/api_keys.yaml"   # Key 白名单文件(不入 Git)
+  log_only: false               # 过渡期: 无/错 Key 仅记日志不拦截
+  rate_limit:
+    default_qpm: 100            # 默认每分钟请求数(硬限制)
+    default_daily: 10000        # 默认每日调用量(硬限制)
+    default_concurrent: 5       # 默认最大并发(软限制, 排队)
+    default_queue_size: 20      # 默认排队队列容量
+    default_queue_timeout: 30   # 默认排队超时(秒)
+
+paths:
+  product_dir: "data/tables"       # daily_download_product_tables.py 发布目录
+  processed_dir: "data/processed"  # 推荐离线索引（skus/outfits.jsonl 等）
+  # 搭配预览 JSON：data/preview/fila_outfits.json（build_fila_guide_outfits.py）
+  logs_dir: "data/logs"
+  prompt_dir: "prompt"
+
+intent:
+  method: "llm"                     # llm | trie
+  dict_dir: "backend/intent/dictionaries"
+  confidence_threshold: 0.6         # 低于此值 fallback LLM
+  image_sim_override_threshold: 0.9 # 图搜 top1 sim >= 此值，用图信息覆盖 slots（top1 模式）
+  image_slot_mode: "top1"           # "top1" 仅用 top-1 SKU 覆盖 | "vote" 多 SKU 投票
+  image_vote_min_similarity: 0.8    # 投票模式参与投票的最低相似度
+  llm_fallback_enabled: true
+  llm_fallback_timeout_sec: 3
+  image_priority_slots: ["gender", "season", "anchor_role"]
+
+prompt_files:
+  intent_extract: "prompt/intent_extract.md"
+  sku_search_intent: "prompt/sku_search_intent.md"
+  vision_image_understand: "prompt/vision_image_understand.md"
+  vision_white_front: "prompt/vision_white_front.md"
+  ranking_outfit_score: "prompt/ranking_outfit_score.md"
+  eval_aesthetic: "prompt/eval_aesthetic.md"
+
+models:
+  intent_llm:
+    provider: openai_compatible
+    mode: local
+#    base_url: "https://ai.anta.com/aimodels-server/private/llm/v1"
+#    api_key_env: "ANTA_LLM_API_KEY"
+    base_url: "https://ai.anta.com/aimodels-server/private/llm/v1"
+    api_key_env: "sk-33d77aea509749c4909d8fb5e8afddff"
+    model: "qwen3.5-flash"
+    timeout_sec: 120
+    enable_thinking: false
+    max_tokens: 1024
+    max_retries: 2          # 单模型重试次数；耗尽后按 fallback_models 换模型再调
+    retry_delay_sec: 2
+    # 主模型多次重试仍失败（429/5xx/超时/4xx）时，依次换这些模型再调
+    fallback_models: ["qwen3.7-plus"]
+
+  vision_llm:
+    provider: openai_compatible
+    mode: local
+    base_url: "http://10.213.148.68:31586/v1"
+    api_key_env: "ANTA_LLM_API_KEY"
+    model: "qwen3.6-27b"
+    timeout_sec: 180
+    enable_thinking: false
+    max_tokens: 4096
+
+  reason_llm:
+    provider: openai_compatible
+    mode: local
+    base_url: "https://ai.anta.com/aimodels-server/private/llm/v1"
+    api_key_env: "ANTA_LLM_API_KEY"
+    model: "qwen3.5-flash"
+    timeout_sec: 120
+    enable_thinking: false
+    max_tokens: 2048
+    max_retries: 2
+    retry_delay_sec: 2
+    fallback_models: ["qwen3.7-plus"]
+
+  ranking_llm:
+    provider: openai_compatible
+    mode: local
+    base_url: "https://ai.anta.com/aimodels-server/private/llm/v1"
+    api_key_env: "ANTA_LLM_API_KEY"
+    model: "qwen3.5-flash"
+    timeout_sec: 180
+    enable_thinking: false
+    max_tokens: 4096
+    max_retries: 2
+    retry_delay_sec: 2
+    fallback_models: ["qwen3.7-plus"]
+
+  tryon_llm:
+    base_url: "https://ai.anta.com/aimodels-server/private"
+    api_key_env: "ANTA_LLM_API_KEY"
+    model: "vertex-tryon"
+    timeout_sec: 180
+    poll_interval_sec: 5
+    max_poll_attempts: 60
+
+  eval_llm:
+    provider: openai_compatible
+    mode: local
+    base_url: "https://ai.anta.com/aimodels-server/private/llm/v1"
+    api_key_env: "ANTA_LLM_API_KEY"
+    model: "qwen3.5-flash"
+    timeout_sec: 120
+    enable_thinking: false
+    max_tokens: 2048
+    max_retries: 2
+    retry_delay_sec: 2
+    fallback_models: ["qwen3.7-plus"]
+
+embedding:
+  provider: ark
+  mode: saas
+  model: "doubao-embedding-vision-251215"
+  api_key_env: "ARK_API_KEY"
+  dimensions: 1024
+  encoding_format: "float"
+  timeout_sec: 120
+  max_retries: 3
+  retry_delay_sec: 2
+
+review:
+  # 评审意见存储后端:sqlite | es (硬切换,单后端)。es 需先建索引并配置 elasticsearch.indices.reviews
+  storage: es
+
+elasticsearch:
+  enabled: true
+  # 测试集群 umalog-4app-test（ES 7.9.3）；环境变量 ES_HOSTS 可覆盖（逗号分隔多节点）
+  hosts:
+    - "https://es-cn-4ta4vp6dm00010t6f.elasticsearch.aliyuncs.com:9200"
+  # 账号通过环境变量注入，勿写入本文件：
+  #   export ES_USERNAME=maiamgs-dev
+  #   export ES_PASSWORD='...'   # 含 # 等特殊字符须单引号
+  username_env: "ES_USERNAME"
+  password_env: "ES_PASSWORD"
+  indices:
+    # umalog 测试集群须使用 umalog-q-maiamgs-index-* 前缀
+    skus: "umalog-q-maiamgs-index-fila-skus"
+    outfits: "umalog-q-maiamgs-index-fila-outfits"
+    reviews: "umalog-q-maiamgs-index-fila-reviews"
+    # 对外请求审计落库（输入/意图/召回/结果），需预先在该集群创建
+    requests: "umalog-q-maiamgs-index-fila-requests"
+  # 对外请求审计开关：false 时既不写也不查（查询 API 返空/503）
+  request_audit:
+    enabled: true
+
+milvus:
+  enabled: true
+  # 连接模式：local = Milvus Lite 本地 *.db（默认）| cloud = 阿里云托管 Milvus
+  # 环境变量 FILA_MILVUS_MODE 可覆盖本项（local | cloud）
+  mode: cloud
+  mode_env: "FILA_MILVUS_MODE"
+  # 本地 Milvus Lite（mode=local 且未设置 FILA_MILVUS_URI 时使用，相对本目录）
+  local_data_file: "data/milvus_local/fila_milvus.db"
+  # 阿里云托管 Milvus（mode=cloud 时使用；FILA_MILVUS_URI 仍可覆盖 uri）
+  cloud:
+    # 测试实例 ec-chat-vctor-q01（内网）
+    uri: "http://c-23377723aefbb385-internal.milvus.aliyuncs.com:19530"
+    username: "root"
+    username_env: "FILA_MILVUS_USERNAME"
+    password_env: "FILA_MILVUS_PASSWORD"
+  uri_env: "FILA_MILVUS_URI"
+  token_env: "FILA_MILVUS_TOKEN"
+  collections:
+    sku_vectors: "fila_sku_vectors"
+    sku_text_vectors: "fila_sku_text_vectors"
+    sku_complementary_vectors: "fila_sku_complementary_vectors"
+    sku_hybrid_vectors: "fila_sku_hybrid_vectors"   # BM25+dense hybrid（descent 复刻）
+  vector_field: "product_vector"
+  text_vector_field: "text_vector"
+  # fila 的 sku_text_vectors 集合有 role/gender 标量字段，开启 expr 过滤提升召回精度
+  text_vector_expr_filter: true
+  # hybrid 检索参数（FilaSkuHybridSearcher 使用，复刻 descent）
+  hybrid:
+    keyword_weight: 0.2
+    semantic_weight: 0.8
+    ranker: rrf            # rrf | weighted
+    default_limit: 20
+    nprobe: 16
+    llm_rewrite: false     # 可选 LLM query 改写，默认关（fila 关键词来自 intent 层）
+  metric_type: "COSINE"
+  # 独立 Milvus 集群用 HNSW；本地 *.db（Milvus Lite）由脚本自动改为 IVF_FLAT
+  index_type: "HNSW"
+  index_params:
+    M: 32
+    efConstruction: 200
+  # Lite 建索引 IVF_FLAT 的 nlist（仅 uri 为 *.db 时生效）
+  index_params_lite:
+    nlist: 128
+  search_params:
+    ef: 128
+    # Lite + IVF_FLAT 检索用 nprobe（仅本地 *.db 时由 milvus_client 选用）
+    nprobe: 16
+  # sku_text_vectors 集合的 BM25 + dense 混合检索。
+  # 集合含 sparse_vector 字段时启用 hybrid_search；否则运行时自动降级 dense-only
+  # （零停机：先部署代码→再重建集合→自动切 hybrid）。本地 *.db（Lite）不支持 BM25，强制降级。
+  text_hybrid:
+    enabled: true
+    search_text_field: "search_text"
+    sparse_vector_field: "sparse_vector"
+    # weighted: WeightedRanker(keyword_weight, semantic_weight, norm_score=true)
+    # rrf: RRFRanker(k)
+    ranker: "weighted"
+    keyword_weight: 0.2
+    semantic_weight: 0.8
+    rrf_k: 60
+    # search_text 字段分词器（enable_analyzer=True 时用）
+    analyzer_params:
+      type: "chinese"
+    sparse_index:
+      index_type: "SPARSE_INVERTED_INDEX"
+      metric_type: "BM25"
+      params:
+        drop_ratio_build: 0.2
+
+logging:
+  level: "INFO"
+  format: "jsonl"
+  output: "file"
+  base_dir: "data/logs"
+  enable_replay_dump: true
+  debug_api_io: true
+  debug_recommend_pipeline: true
+  record_recommend_timing: true
+  redact:
+    image_base64: true
+    api_key: true
+    prompt_max_chars: 2000
+
+recommend:
+  # 召回拼套：各路召回/拼套阶段每路最多产出搭配套数
+  recall_outfit_limit: 10
+  # 排序截断：精排（规则/LLM 排序+理由）后最终返回给用户的套数
+  rank_outfit_limit: 6 
+  default_sku_per_role: 100
+  # 粗排打分方式：rule = 规则打分（默认）| model = 模型打分
+  coarse_ranking_method: "model"
+  # 模型打分服务配置（仅 coarse_ranking_method=model 时生效）
+  outfit_model_score:
+    service_url: "http://10.213.148.68:31861"
+    timeout: 5 
+  # 粗排：规则打分截断候选集数量（召回去重后 → 送入 LLM 精排前）
+  coarse_rank_limit: 20
+  # 粗排规则打分权重（总和应为 1.0）
+  outfit_rank_weights:
+    source_match: 0.30
+    intent_match: 0.15
+    completeness: 0.11
+    category_l2_match: 0.15
+    tryon_coverage: 0.09
+    color_harmony: 0.1
+    price_match: 0.05
+    diversity: 0.05
+  # 在线属性缺陷检测（每次 chat_stream 结束后自动检查搭配属性匹配缺陷，写入 JSONL 日志）
+  defect_check_online: false
+  # 调试台是否在搭配卡片展示排序总分与分项（默认关闭）
+  show_outfit_rank_scores: true
+  skip_reason: true
+  # LLM 排序+推荐理由合并为一次调用（默认开启），关闭时走 rule 排序且不生成理由
+  enable_llm_rank_reason: true
+  # enable_llm_rank_reason=true 时的调用方式：
+  #   ranking_llm = 现有方式（ranking_llm 文本模型，ranking_llm_mode: batch/parallel，JSON 打分+理由）
+  #   partner     = 私有部署裸 vLLM 多模态模型（fila-outfit-v6_1），逐套并行调用 V6 美学评分，
+  #                 综合评分(0-10)归一化后排序、评语作为推荐理由（参考 scripts/partner_call_example.py）
+  #   partner_qwen = 排序走 partner vLLM(fila-outfit-v6_1) 仅取分数、推荐理由走 qwen3.5-flash 文本模型，
+  #                 两步在请求级 asyncio.gather 并行；理由覆盖整套 coarse 后按 outfit_id 写回幸存者。
+  #   partner_vision = 排序走 partner vLLM(fila-outfit-v6_1) 仅取分数、推荐理由走本地 qwen3.6-27b
+  #                 (models.vision_llm) 看单品 tryon_image 生成，两步并行；调用方式参考
+  #                 scripts/fila_images_preprocess.py(OpenAI SDK)，图片不下载直接用 url。
+  llm_rank_reason_method: "ranking_llm"
+  # partner 模型配置（llm_rank_reason_method=partner / partner_qwen / partner_vision 时的排序后端）
+  # model 可选两版（按模型名自动切换调用路径 + base_url，调用方式见对应脚本）：
+  #   fila-outfit-v6_1  → V6，base_url + scripts/partner_call_example.py（综合分取模型 raw）
+  #   fila-outfit-v8sws → V8，base_url_v8 + scripts/v8sws_client.py（五维+外部 f 覆写综合分）
+  # 两版部署实例不同，URL 都显式配在下面；切版只改 model 一行，base_url 自动按版本选取。
+  partner_rank_reason:
+    base_url: "http://10.215.6.10:32207"      # fila-outfit-v6_1 裸 vLLM NodePort，直连
+    base_url_v8: "http://10.215.6.10:32616"   # fila-outfit-v8sws 裸 vLLM NodePort，直连
+    model: "fila-outfit-v6_1"
+    api_key_env: "ANTA_LLM_API_KEY"         # 私有部署通常无鉴权，env 未设则不带 Authorization
+    timeout_sec: 60
+    max_tokens: 600                         # V6(fila-outfit-v6_1) 输出上限
+    max_tokens_v8: 700                      # V8(fila-outfit-v8sws) 输出上限（五维CoT+综合+评语约450-600）
+    temperature: 0
+    max_workers: 5                          # 逐套并行打分+理由线程数
+  # 推荐理由多模态模型（llm_rank_reason_method=partner_vision 时 vision_reasoner 生成理由用）
+  # 独立部署实例，覆盖 models.vision_llm.base_url；其余字段(model/api_key/timeout 等)继承 vision_llm
+  vision_reason_llm:
+    base_url: "http://10.213.148.68:32429/v1"   # 新部署的 qwen3.6-27b 实例（vLLM，带 /v1）
+  # 搭配组合模式：per_channel = 各路各自召回单品后在通道内拼套（旧逻辑）
+  # | global = 各路只召回 per-role 单品 → 聚合进全局候选池（RRF 融合多路分数）
+  # → 统一拼套一次。某路缺某 role 时其他路可补，避免好单品被埋进残缺搭配。
+  compose_mode: "global"
+  # 搭配多路召回开关（默认：相似固定搭配、Query2ES 拼套、文本向量拼套、多模态互补模型）
+  recall_paths:
+    image_vector: true 
+    query2es: true 
+    text_vector: true
+    complementary_model: true
+  # 多模态互补模型召回配置（outfit-transformer embed_query → Milvus 近邻搜索）
+  complementary_model:
+    service_url: "http://10.213.148.68:31861"
+    timeout: 5
+    top_k_per_role: 50
+  # Query2ES：每个 target_role 从 ES 取 top N（默认同 default_sku_per_role）
+  es_top_n_per_role: 100
+  query2es_llm_enabled: false
+  # category_l2 搭配规则数据源：cooccurrence（从搭配数据统计，默认）| cartesian（LLM 笛卡尔积打分）
+  category_l2_pairing_source: cartesian 
+  # category_l2 搭配召回白名单：primary = primary_companions（默认，更严格）| allowed = allowed_companions
+  category_l2_pairing_list: primary
+  # 置信度自适应过滤阈值（anchor_as_master_count）：
+  #   >= primary_min_count → 使用 primary_companions
+  #   >= allowed_min_count → 使用 allowed_companions
+  #   < allowed_min_count  → 不做中类过滤，仅按 role 过滤
+  category_l2_pairing_confidence_thresholds:
+    primary_min_count: 50
+    allowed_min_count: 10
+  # 搭配召回时是否启用 category_l2 搭配规则过滤
+  enable_category_l2_pairing: true
+  # 搭配召回时是否启用 scene_domain 场景域冲突下推过滤
+  # （日常服×专业运动服不互搭，下推到 ES must_not / Milvus expr，post-filter 兜底）
+  enable_scene_domain_filter: true
+  # 上架时间过滤（ES/Milvus 召回常驻 up_time >= today(UTC) - up_time_filter_days）：
+  # - enable_up_time_filter (bool, 默认 true)：总开关。false → 全量召回不过滤。
+  # - up_time_filter_days (int, 默认 180)：滚动窗口天数，仅过滤开启时生效。
+  enable_up_time_filter: true
+  up_time_filter_days: 180
+  # 对外接口 app_id 白名单(ISS-04): 列表内为合法调用方; 非白名单返 401 invalid app_id。
+  # - 键缺失 → 不强制(向后兼容, 任何非空 app_id 通过)
+  # - 键存在(含空列表) → 强制校验
+  # 现网调用方: micro_guide(导购小程序) / wechat_mini(微信小程序), 详见 docs/FILA接口鉴权与限流方案.md
+  allowed_app_ids:
+    - micro_guide
+    - wechat_mini
+  # 搭配召回时是否启用 color_series 色系搭配规则过滤
+  enable_color_series_pairing: true
+  # 搭配召回时是否启用方向化色系配对 YAML（上装→下装 与 下装→上装 统计不对称，
+  # 分别取 fila_sku_color_pairing_top_bottom.yaml / fila_sku_color_pairing_bottom_top.yaml；
+  # 未覆盖的方向如 鞋→上装 回退到对称的 color_series_pairing.yaml）
+  enable_directional_color_series_pairing: true
+  # 色系搭配规则置信度自适应阈值（anchor_count）：
+  #   >= primary_min_count → 使用 primary_companions（严格）
+  #   >= allowed_min_count → 使用 allowed_companions（宽松）
+  #   < allowed_min_count  → 不做色系过滤
+  color_series_pairing_confidence_thresholds:
+    primary_min_count: 200
+    allowed_min_count: 50
+  # 召回去重多样性：每个 role 内同一 (category_l2, color_series) 组合最多保留 N 个得分最高的 SKU，0 或不设表示不限制
+  recall_unique_category_color_top_n: 1
+  milvus_top_k: 10
+  text_milvus_top_k: 15
+  text_keyword_max: 6
+  # 文本召回通路开关（灰度切量）：dense = 旧 dense 文本向量(默认) | hybrid = BM25+dense hybrid(descent 复刻)
+  # 切量：改为 hybrid + restart；回滚：改回 dense + restart。hybrid 0 命中自动 fallback dense。
+  text_recall_mode: "hybrid"
+  sku_vector_min_similarity: 0.75
+  sku_text_vector_min_similarity: 0.55
+  # 渐进式过滤放宽：某 role 0 命中时按优先级逐个丢弃 soft slot 直到命中数达标。
+  # enable=false 时退回旧行为（ES 三级阶梯 / 文本路二级递归 / 互补路无放宽）。
+  # 硬约束 gender/season/age 永不在此列表中；up_time/price 在链尾、最后才放宽。
+  enable_progressive_relax: false 
+  relax_priority:
+    - modeling
+    - length_class
+    - coverage
+    - series
+    - scene_domain
+    - color_series
+    - category_l2
+    - anchor_attr_must_not
+    - up_time
+    - price
+  relax_min_hits: 1
+  outfit_reason_mode: "outfit_only"
+  # 搭配推荐理由生成方式：llm = LLM生成（注入话术few-shot）| template = 直接用标签召回话术
+  reason_generation_mode: "llm"
+  reason_parallel_max_workers: 5
+  # 搭配排序打分方式：rule = 规则打分（默认）| llm = 大模型打分
+  ranking_scoring_method: "rule"
+  # LLM 打分模式（仅 ranking_scoring_method=llm 时生效）：
+  #   batch  = 所有搭配一起输入大模型批量打分
+  #   parallel = 多线程并行调用大模型逐套打分
+  ranking_llm_mode: "batch"
+  # LLM 打分并行线程数（仅 parallel 模式）
+  ranking_llm_max_workers: 5
+  tryon:
+    enabled: false
+    # 已有穿搭图的固定搭配是否替换（默认 false 不替换）
+    replace_existing_image: true
+    # 并行试穿最大线程数（图片下载/拼接/提交共用），默认 3
+    max_workers: 5
+    # 按性别配置模特图 URL（FILA 可按需替换）
+    person_images:
+      male: "https://img.fishfay.com/shopgoods/8/tmall/D6231DTS89/cd-D6231DTS89-10/0b6d1be73e063761e087cf30754b9e11.jpg"
+      female: "https://img.fishfay.com/shopgoods/8/tmall/D6232DPS84/cd-D6232DPS84-10/0a7aa9f5fb1b4e358fed1839568b41b0.jpg"
+      boy: "https://img.fishfay.com/shopgoods/8/tmall/Y6133TJK51/cd-Y6133TJK51-10/3198603445906807ac80893a5680dbd0.jpg"
+      girl: "https://img.fishfay.com/shopgoods/8/tmall/Y6232DWK01/cd-Y6232DWK01-10/8cf049c0640960ccf4bba79a535f5119.jpg"
+  reason_prompts:
+    per_item: "prompt/reason_per_item.md"
+    outfit_only: "prompt/reason_outfit_only.md"
+    both_outfit: "prompt/reason_both_outfit.md"
+    both_per_item: "prompt/reason_both_per_item.md"
+
+# ── 检索调试工具（可选）──
+# 单索引模式：默认使用上方 embedding + milvus 配置，无需额外设置
+# 双索引模式：设置 enabled=true 并配置两个索引的 embedding + milvus
+search_debug:
+  ann:
+    dual_index:
+      enabled: false
+      # 恰好 2 条索引，每条需指定 embedding 和 milvus 配置
+      # 路径相对于 fila_agent_html/ 根目录
+      indexes: []
+      # 示例：
+      # - id: qwen3_vl
+      #   label: "qwen3-vl-embedding-8b"
+      #   embedding:
+      #     provider: qwen3_vl
+      #     base_url: "http://10.213.148.68:31039"
+      #     api_key: ""
+      #     model: ""
+      #     dimensions: 4096
+      #   milvus:
+      #     local_data_file: "data/milvus_local/fila_qwen3_vl.db"
+      #     collection: "fila_qwen3_vl_sku"
+      #     vector_field: "product_vector"
+      #     metric_type: "COSINE"
+      # - id: doubao_vision
+      #   label: "doubao-embedding-vision-251215"
+      #   embedding:
+      #     provider: ark
+      #     base_url: "https://ark.cn-beijing.volces.com/api/v3"
+      #     api_key_env: "ARK_API_KEY"
+      #     model: "doubao-embedding-vision-251215"
+      #     dimensions: 1024
+      #   milvus:
+      #     local_data_file: "data/milvus_local/fila_milvus.db"
+      #     collection: "fila_sku_vectors"
+      #     vector_field: "product_vector"
+      #     metric_type: "COSINE"
+  es:
+    default_size: 20

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>请求审计 · FILA</title>
+    <link rel="stylesheet" href="/web/styles.css?v=20260728-audit" />
+    <script>
+      (function () {
+        var saved = localStorage.getItem('fila_agent_html_theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.dataset.theme = saved;
+        }
+      })();
+    </script>
+    <style>
+      body { margin: 0; padding: 16px 20px 60px; }
+      .audit-header { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+      .audit-header h1 { font-size: 18px; margin: 0; }
+      .audit-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+      .audit-filters label { display: flex; flex-direction: column; font-size: 12px; gap: 2px; }
+      .audit-filters input, .audit-filters select { padding: 4px 6px; font-size: 13px; min-width: 120px; }
+      .audit-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .audit-table th, .audit-table td { border-bottom: 1px solid var(--border, #2a2f3a); padding: 6px 8px; text-align: left; vertical-align: top; }
+      .audit-table tr { cursor: pointer; }
+      .audit-table tr:hover { background: rgba(127,127,127,0.12); }
+      .tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; }
+      .tag-ok { background: #1f6f3f; color: #fff; }
+      .tag-err { background: #8a2f2f; color: #fff; }
+      .tag-recommend { background: #2a4a8a; color: #fff; }
+      .tag-regenerate { background: #6a4a2a; color: #fff; }
+      #detail { margin-top: 20px; border-top: 2px solid var(--border, #2a2f3a); padding-top: 14px; }
+      #detail pre { background: rgba(127,127,127,0.1); padding: 10px; border-radius: 6px; overflow: auto; font-size: 12px; max-height: 60vh; }
+      .muted { color: var(--muted, #888); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="audit-header">
+      <h1>请求审计</h1>
+      <a href="/web/index.html" class="muted">← 返回调试台</a>
+      <span id="audit-state" class="muted"></span>
+    </div>
+
+    <div class="audit-filters">
+      <label>trace_id<input id="f-trace" /></label>
+      <label>app_id<input id="f-app" /></label>
+      <label>类型
+        <select id="f-kind">
+          <option value="">全部</option>
+          <option value="recommend">recommend</option>
+          <option value="regenerate_reason">regenerate_reason</option>
+        </select>
+      </label>
+      <label>状态
+        <select id="f-status">
+          <option value="">全部</option>
+          <option value="ok">ok</option>
+          <option value="error">error</option>
+        </select>
+      </label>
+      <label>起始(>=)<input id="f-from" placeholder="2026-07-28" /></label>
+      <label>结束(<=)<input id="f-to" placeholder="2026-07-29" /></label>
+      <label>条数<input id="f-size" value="50" /></label>
+      <button id="btn-search" type="button">查询</button>
+      <button id="btn-reset" type="button">清空</button>
+    </div>
+
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th>ts</th><th>类型</th><th>状态</th><th>trace_id</th>
+          <th>app_id</th><th>输入</th><th>套数</th><th>耗时ms</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div id="detail"></div>
+
+    <script src="/web/audit.js?v=20260728-audit"></script>
+  </body>
+</html>

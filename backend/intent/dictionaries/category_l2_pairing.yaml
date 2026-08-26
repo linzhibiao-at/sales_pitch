@@ -1,0 +1,547 @@
+# 中类(category_l2)搭配规则（共现统计）
+# 共 54 个中类
+# 字段: role(角色) / anchor_count(锚点统计数) / primary(首选搭配) / allowed(允许搭配)
+# 生成脚本: scripts/extract_category_l2_pairing_rules.py
+
+pairing_rules:
+  休闲鞋:
+    allowed:
+    - 包
+    - 半身裙
+    - 帽子
+    - 梭织上衣
+    - 短袖T恤
+    - 短袖编织衫
+    - 羽绒服
+    - 长羽绒服
+    anchor_count: 41
+    primary:
+    - 梭织上衣
+    - 短袖T恤
+    - 短袖编织衫
+    - 羽绒服
+    - 长羽绒服
+    role: 鞋
+  儿童鞋:
+    role: 鞋
+  凉鞋:
+    allowed:
+    - 包
+    - 半身裙
+    - 短袖T恤
+    - 短袖编织衫
+    anchor_count: 59
+    primary:
+    - 短袖T恤
+    - 短袖编织衫
+    role: 鞋
+  包:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 半身裙
+    - 帆布鞋
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 梭织五分裤
+    - 梭织短裤
+    - 梭织长裤
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    - 背心
+    - 跑鞋
+    - 连衣裙
+    - 针织上衣
+    - 针织长裤
+    anchor_count: 20169
+    primary:
+    - 休闲鞋
+    - 半身裙
+    - 板鞋
+    - 梭织上衣
+    - 梭织短裤
+    - 梭织长裤
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    - 针织长裤
+    role: 包
+  半身裙:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 包
+    - 帽子
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 短袖衬衫
+    - 网球鞋
+    - 老爹鞋
+    - 背心
+    anchor_count: 3827
+    primary:
+    - 休闲鞋
+    - 包
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    role: 下装
+  单层冲锋衣:
+    allowed:
+    - 梭织两件套
+    anchor_count: 8
+    primary:
+    - 梭织两件套
+    role: 外套
+  套头卫衣:
+    allowed:
+    - 梭织两件套
+    anchor_count: 4
+    primary:
+    - 梭织两件套
+    role: 上装
+  帆布鞋:
+    allowed:
+    - 帽子
+    - 梭织长裤
+    - 短袖T恤
+    - 短袖衬衫
+    - 短袖针织上衣
+    anchor_count: 121
+    primary:
+    - 短袖T恤
+    role: 鞋
+  帽子:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 半身裙
+    - 帆布鞋
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 梭织五分裤
+    - 梭织短裤
+    - 梭织长裤
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    - 跑鞋
+    - 连衣裙
+    - 针织上衣
+    - 针织长裤
+    anchor_count: 11101
+    primary:
+    - 休闲鞋
+    - 半身裙
+    - 帆布鞋
+    - 板鞋
+    - 梭织短裤
+    - 梭织长裤
+    - 短袖T恤
+    - 老爹鞋
+    role: 配饰
+  户外鞋:
+    allowed:
+    - 半身裙
+    - 梭织上衣
+    - 短袖T恤
+    - 短袖衬衫
+    anchor_count: 32
+    primary:
+    - 梭织上衣
+    - 短袖T恤
+    - 短袖衬衫
+    role: 鞋
+  拖鞋:
+    role: 鞋
+  板鞋:
+    allowed:
+    - 包
+    - 半身裙
+    - 帽子
+    - 梭织短裤
+    - 短袖T恤
+    - 针织上衣
+    - 长袖T恤
+    - 长袖衬衫
+    anchor_count: 31
+    primary:
+    - 短袖T恤
+    - 针织上衣
+    - 长袖T恤
+    - 长袖衬衫
+    role: 鞋
+  梭织七分裤:
+    allowed:
+    - 休闲鞋
+    - 板鞋
+    - 梭织上衣
+    - 梭织马甲
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    anchor_count: 133
+    primary:
+    - 休闲鞋
+    - 板鞋
+    - 短袖T恤
+    - 老爹鞋
+    role: 下装
+  梭织上衣:
+    allowed:
+    - 包
+    - 半身裙
+    - 梭织长裤
+    - 老爹鞋
+    role: 上装
+  梭织两件套:
+    role: unknown
+  梭织五分裤:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 包
+    - 帆布鞋
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 短袖衬衫
+    - 老爹鞋
+    anchor_count: 1215
+    primary:
+    - 板鞋
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    role: 下装
+  梭织短裤:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 包
+    - 帽子
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 短袖衬衫
+    - 编织衫
+    - 网球鞋
+    - 老爹鞋
+    - 背心
+    - 跑鞋
+    - 长袖衬衫
+    anchor_count: 1766
+    primary:
+    - 板鞋
+    - 梭织上衣
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    role: 下装
+  梭织长裤:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 包
+    - 帆布鞋
+    - 帽子
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 老爹鞋
+    - 背心
+    - 跑鞋
+    - 长袖T恤
+    - 长袖衬衫
+    anchor_count: 3422
+    primary:
+    - 包
+    - 帽子
+    - 户外鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 老爹鞋
+    role: 下装
+  梭织马甲:
+    role: 外套
+  棉马甲:
+    role: unknown
+  滑雪服:
+    role: unknown
+  滑雪裤:
+    allowed:
+    - 滑雪服
+    - 羽绒服
+    anchor_count: 6
+    primary:
+    - 滑雪服
+    - 羽绒服
+    role: unknown
+  潮鞋:
+    role: 鞋
+  短袖POLO:
+    allowed:
+    - 包
+    - 半身裙
+    - 梭织长裤
+    - 老爹鞋
+    role: 上装
+  短袖T恤:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 包
+    - 半身裙
+    - 帆布鞋
+    - 帽子
+    - 户外鞋
+    - 板鞋
+    - 梭织五分裤
+    - 梭织短裤
+    - 梭织长裤
+    - 老爹鞋
+    - 针织长裤
+    primary:
+    - 包
+    - 半身裙
+    - 帽子
+    - 梭织长裤
+    - 老爹鞋
+    role: 上装
+  短袖梭织上衣:
+    role: 上装
+  短袖编织衫:
+    allowed:
+    - 包
+    - 半身裙
+    - 老爹鞋
+    role: 上装
+  短袖衬衫:
+    role: 上装
+  短袖针织上衣:
+    role: 上装
+  编织开衫:
+    role: 上装
+  编织衫:
+    role: 上装
+  网球包:
+    allowed:
+    - 棉马甲
+    - 运动文胸
+    - 针织上衣
+    - 针织打底裤
+    anchor_count: 16
+    primary:
+    - 棉马甲
+    - 运动文胸
+    - 针织上衣
+    - 针织打底裤
+    role: unknown
+  网球鞋:
+    anchor_count: 7
+    role: 鞋
+  羽绒服:
+    role: 外套
+  老爹鞋:
+    allowed:
+    - 包
+    - 半身裙
+    - 帽子
+    - 梭织上衣
+    - 梭织五分裤
+    - 梭织短裤
+    - 梭织长裤
+    - 滑雪服
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 编织开衫
+    - 羽绒服
+    - 针织上衣
+    - 针织长裤
+    - 长羽绒服
+    anchor_count: 552
+    primary:
+    - 包
+    - 半身裙
+    - 帽子
+    - 梭织长裤
+    - 短袖T恤
+    role: 鞋
+  背心:
+    role: 上装
+  袜子:
+    allowed:
+    - 半身裙
+    - 梭织短裤
+    - 短袖T恤
+    - 短袖编织衫
+    - 短袖衬衫
+    - 老爹鞋
+    - 连衣裙
+    - 高尔夫鞋
+    anchor_count: 171
+    primary:
+    - 半身裙
+    - 梭织短裤
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    - 连衣裙
+    - 高尔夫鞋
+    role: 配饰
+  跑鞋:
+    allowed:
+    - 短袖POLO
+    - 短袖T恤
+    anchor_count: 34
+    primary:
+    - 短袖POLO
+    - 短袖T恤
+    role: 鞋
+  运动文胸:
+    role: unknown
+  运动鞋:
+    role: 鞋
+  连帽卫衣:
+    role: 上装
+  连衣裙:
+    allowed:
+    - 休闲鞋
+    - 凉鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖T恤
+    - 老爹鞋
+    - 针织上衣
+    - 长袖衬衫
+    - 高尔夫鞋
+    anchor_count: 160
+    primary:
+    - 休闲鞋
+    - 凉鞋
+    - 板鞋
+    - 短袖T恤
+    - 老爹鞋
+    role: 连衣裙
+  针织上衣:
+    allowed:
+    - 老爹鞋
+    - 针织长裤
+    role: 上装
+  针织五分裤:
+    allowed:
+    - 休闲鞋
+    - 帆布鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 短袖衬衫
+    - 老爹鞋
+    - 针织上衣
+    anchor_count: 156
+    primary:
+    - 帆布鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 老爹鞋
+    role: unknown
+  针织打底裤:
+    allowed:
+    - 户外鞋
+    - 梭织上衣
+    - 跑鞋
+    anchor_count: 13
+    primary:
+    - 户外鞋
+    - 梭织上衣
+    - 跑鞋
+    role: 下装
+  针织短裤:
+    allowed:
+    - 户外鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 针织马甲
+    anchor_count: 111
+    primary:
+    - 户外鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 针织马甲
+    role: 下装
+  针织长裤:
+    allowed:
+    - 休闲鞋
+    - 包
+    - 套头卫衣
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 编织开衫
+    - 老爹鞋
+    - 跑鞋
+    - 针织上衣
+    - 长袖T恤
+    - 长袖衬衫
+    anchor_count: 1419
+    primary:
+    - 休闲鞋
+    - 板鞋
+    - 梭织上衣
+    - 短袖POLO
+    - 短袖T恤
+    - 短袖编织衫
+    - 老爹鞋
+    - 针织上衣
+    role: 下装
+  针织马甲:
+    role: 外套
+  长羽绒服:
+    role: 外套
+  长袖POLO:
+    role: 上装
+  长袖T恤:
+    allowed:
+    - 梭织两件套
+    anchor_count: 13
+    primary:
+    - 梭织两件套
+    role: 上装
+  长袖衬衫:
+    role: 上装
+  防晒服:
+    role: 外套
+  高尔夫鞋:
+    role: 鞋

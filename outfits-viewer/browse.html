@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>商品浏览 · FILA</title>
+    <link rel="stylesheet" href="/outfits-viewer/styles.css" />
+    <style>
+      /* 浏览页用浏览器原生文档滚动（覆盖 viewer-page 的 height:100vh+overflow:hidden，
+         后者是为 #scroll-root 内滚设计的；本页无 #scroll-root，商品多了需整页滚动） */
+      body.viewer-page {
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      /* 浏览页布局：左侧筛选栏 + 右侧商品网格 */
+      .browse-layout {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        padding: 12px 16px;
+      }
+      .filter-sidebar {
+        width: 220px;
+        flex: 0 0 220px;
+        background: #1a1e26;
+        border: 1px solid #2a2f3a;
+        border-radius: 10px;
+        padding: 10px 12px 14px;
+        position: sticky;
+        top: 12px;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+      }
+      .filter-sidebar h2 {
+        font-size: 0.9rem;
+        margin: 4px 0 8px;
+      }
+      .filter-group {
+        border-top: 1px solid #2a2f3a;
+        padding: 8px 0 6px;
+      }
+      .filter-group:first-of-type {
+        border-top: none;
+      }
+      .filter-group .group-title {
+        font-size: 0.78rem;
+        color: #9fb0c8;
+        margin: 0 0 6px;
+        font-weight: 600;
+      }
+      .filter-options {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        max-height: 168px;
+        overflow-y: auto;
+      }
+      .filter-options label {
+        font-size: 0.76rem;
+        color: #d8dde6;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        line-height: 1.4;
+      }
+      .filter-options label:hover {
+        color: #fff;
+      }
+      .filter-options .count {
+        color: #6c7686;
+        font-size: 0.68rem;
+        margin-left: auto;
+      }
+      .filter-sidebar .reset-btn {
+        margin-top: 8px;
+        width: 100%;
+        padding: 6px 0;
+        font-size: 0.74rem;
+        background: #222833;
+        color: #cdd6e3;
+        border: 1px solid #2a2f3a;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .filter-sidebar .reset-btn:hover {
+        border-color: #4b5f8a;
+        color: #fff;
+      }
+      .filter-group--since .filter-date {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 5px 6px;
+        font-size: 0.76rem;
+        background: #222833;
+        color: #d8dde6;
+        border: 1px solid #2a2f3a;
+        border-radius: 6px;
+        color-scheme: dark;
+      }
+      .filter-group--since .filter-date::-webkit-calendar-picker-indicator {
+        filter: invert(0.8);
+        cursor: pointer;
+      }
+
+      .product-area {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .product-meta {
+        font-size: 0.8rem;
+        color: #9fb0c8;
+        margin: 4px 0 10px;
+      }
+      /* 复用 styles.css 的 .items-grid + .item-card（132px，与「搭配浏览」页同尺寸，
+         flex-wrap 自适应一行显示多个）。仅补充 price/badges/占位图样式。 */
+      .item-card .price {
+        font-size: 0.78rem;
+        color: #f0a868;
+      }
+      .item-card .badges {
+        font-size: 0.64rem;
+        color: #9fb0c8;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin: 2px 0;
+      }
+      .item-card .badges span {
+        background: #222833;
+        border: 1px solid #2a2f3a;
+        border-radius: 4px;
+        padding: 1px 4px;
+      }
+      .item-card .thumb .ph {
+        color: #4a5263;
+        font-size: 0.7rem;
+      }
+      .load-more-bar {
+        margin-top: 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .load-more-bar button {
+        padding: 8px 22px;
+        font-size: 0.8rem;
+        background: #222833;
+        color: #cdd6e3;
+        border: 1px solid #2a2f3a;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .load-more-bar button:hover {
+        border-color: #4b5f8a;
+        color: #fff;
+      }
+      .load-more-bar .muted {
+        font-size: 0.72rem;
+        color: #6c7686;
+      }
+      .empty-hint {
+        padding: 40px 0;
+        text-align: center;
+        color: #6c7686;
+        font-size: 0.85rem;
+      }
+      @media (max-width: 820px) {
+        .browse-layout {
+          flex-direction: column;
+        }
+        .filter-sidebar {
+          width: 100%;
+          flex: none;
+          position: static;
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+  <body class="viewer-page">
+    <header>
+      <h1>商品浏览</h1>
+      <div id="title-meta" class="meta">加载中…</div>
+      <div class="header-links">
+        <a href="/outfits-viewer/index.html">全部搭配</a>
+      </div>
+    </header>
+
+    <div class="browse-layout">
+      <aside class="filter-sidebar" id="filterSidebar">
+        <h2>筛选</h2>
+        <!-- 筛选组由 browse.js 动态渲染 -->
+        <button class="reset-btn" id="resetBtn" type="button">重置筛选</button>
+      </aside>
+
+      <main class="product-area">
+        <div class="product-meta" id="productMeta"></div>
+        <div class="items-grid" id="productGrid"></div>
+        <div class="load-more-bar" id="loadMoreBar" style="display: none">
+          <button id="loadMoreBtn" type="button">加载更多</button>
+          <span class="muted" id="loadMoreHint"></span>
+        </div>
+      </main>
+    </div>
+
+    <script src="/outfits-viewer/browse.js?v=20260722"></script>
+  </body>
+</html>

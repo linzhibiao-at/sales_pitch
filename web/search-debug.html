@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>检索调试 · FILA</title>
+  <link rel="stylesheet" href="/web/styles.css?v=20260618" />
+  <script>
+    (function () {
+      var saved = localStorage.getItem('fila_agent_html_theme');
+      if (saved === 'light' || saved === 'dark') {
+        document.documentElement.dataset.theme = saved;
+      } else {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
+  <style>
+    /* 检索调试页面独有样式 */
+    .debug-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--header-bg);
+      backdrop-filter: blur(8px);
+    }
+    .debug-header h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    .debug-header h1 a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .debug-header h1 a:hover {
+      color: var(--accent);
+    }
+    .tab-nav {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      background: var(--panel);
+    }
+    .tab-btn {
+      padding: 0.65rem 1.25rem;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+    }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .tab-panel {
+      display: none;
+      padding: 1rem 1.5rem 2rem;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: flex-end;
+      margin-bottom: 1rem;
+    }
+    .toolbar .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .toolbar .field label {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .toolbar input[type="text"],
+    .toolbar input[type="number"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.45rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+    }
+    .toolbar input:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .toolbar input[type="file"] {
+      font: inherit;
+      color: var(--text);
+    }
+    .toolbar button {
+      background: var(--accent);
+      color: var(--btn-on-accent);
+      border: none;
+      padding: 0.5rem 1.1rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .toolbar button:hover:not(:disabled) {
+      background: var(--accent-dim);
+    }
+    .toolbar button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    /* ANN 预览 */
+    .ann-preview {
+      margin-bottom: 0.75rem;
+    }
+    .ann-preview img {
+      max-height: 300px;
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      object-fit: contain;
+    }
+    /* 结果网格 */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .result-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .result-card a {
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .result-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      background: var(--surface-inset);
+      display: block;
+    }
+    .result-card .meta {
+      padding: 8px 10px 10px;
+    }
+    .result-card .sku {
+      font-size: 11px;
+      font-weight: 700;
+      word-break: break-all;
+    }
+    .result-card .title {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .result-card .dist {
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+    /* 双列对比 */
+    .dual-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 900px) {
+      .dual-compare {
+        grid-template-columns: 1fr;
+      }
+    }
+    .dual-col {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      min-height: 200px;
+    }
+    .dual-col h3 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .dual-col .subhead {
+      margin: 0 0 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    /* ES 面板 */
+    .es-smart-panel {
+      margin-bottom: 1rem;
+      padding: 0.85rem 1rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .es-smart-panel h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .json-pre {
+      margin: 0;
+      padding: 0.65rem 0.75rem;
+      background: var(--surface-inset);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      line-height: 1.45;
+      overflow: auto;
+      max-height: 280px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .es-query-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 0.5rem;
+    }
+    @media (max-width: 900px) {
+      .es-query-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .es-query-grid .lbl {
+      font-size: 0.7rem;
+      color: var(--accent);
+      margin-bottom: 0.2rem;
+      display: block;
+    }
+    .es-results-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 900px) {
+      .es-results-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .mv-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 1100px) {
+      .mv-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .es-col {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .es-col-head {
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .es-col-meta {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: 0.75rem;
+      margin-top: 0.2rem;
+    }
+    .es-col-body {
+      padding: 0.75rem;
+      max-height: calc(100vh - 260px);
+      overflow: auto;
+    }
+    .es-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.65rem;
+    }
+    .es-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .es-card .thumb {
+      aspect-ratio: 3 / 4;
+      background: var(--surface-inset);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .es-card .thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .es-card .thumb .ph {
+      font-size: 0.7rem;
+      color: var(--muted);
+      padding: 0.5rem;
+      text-align: center;
+    }
+    .es-card .card-cap {
+      padding: 0.45rem 0.5rem;
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .es-card .card-cap .sku {
+      color: var(--accent);
+      word-break: break-all;
+    }
+    .es-card .card-cap .tit {
+      color: var(--muted);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .es-card .score {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 0.2rem;
+    }
+    .error-msg {
+      color: var(--error);
+      font-size: 0.85rem;
+      padding: 0.5rem;
+    }
+    .llm-err {
+      color: var(--error);
+      font-size: 0.78rem;
+      margin: 0.5rem 0 0;
+      line-height: 1.4;
+    }
+    .llm-hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin: 0.35rem 0 0;
+    }
+    .llm-elapsed {
+      font-size: 0.72rem;
+      font-weight: 500;
+      color: var(--accent);
+    }
+    .empty-hint {
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 1rem 0;
+      text-align: center;
+    }
+    .mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .mode-toggle label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .mode-toggle select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .q-wrap {
+      flex: 1 1 240px;
+      min-width: 200px;
+    }
+    .q-wrap input {
+      width: 100%;
+      min-width: 0;
+    }
+    .btn-copy {
+      flex-shrink: 0;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 0.22rem 0.55rem;
+      font-size: 0.68rem;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-copy:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .query-block-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <header class="debug-header">
+    <h1><a href="/">FILA 穿搭推荐</a> · 检索调试</h1>
+    <nav class="header-actions">
+      <button id="btnTheme" type="button" class="btn theme-toggle" aria-label="切换主题" title="切换白天/黑夜模式">
+        <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+        <span class="theme-icon theme-icon-moon" aria-hidden="true">☽</span>
+      </button>
+      <div class="header-links">
+        <a href="/" target="_blank" rel="noopener">推荐主页</a>
+        <a href="/health" target="_blank" rel="noopener">Health</a>
+      </div>
+    </nav>
+  </header>
+
+  <nav class="tab-nav" aria-label="检索调试标签">
+    <button class="tab-btn active" data-tab="ann">ANN 向量检索</button>
+    <button class="tab-btn" data-tab="es">ES 文本检索</button>
+    <button class="tab-btn" data-tab="milvus">Milvus hybrid</button>
+  </nav>
+
+  <!-- ANN 向量检索面板 -->
+  <section class="tab-panel active" id="panel-ann" aria-label="ANN 向量检索">
+    <div class="toolbar">
+      <div class="field">
+        <label for="annTopK">Top N</label>
+        <input id="annTopK" type="number" min="1" max="100" value="10" />
+      </div>
+      <div class="field">
+        <label for="annFile">查询图片</label>
+        <input id="annFile" type="file" accept="image/*" />
+      </div>
+      <button id="annRun" type="button">检索</button>
+    </div>
+    <div id="annStatus" class="empty-hint" style="text-align:left;font-size:0.75rem;"></div>
+    <div id="annErr" class="error-msg" hidden></div>
+    <div id="annPreview" class="ann-preview" hidden></div>
+    <div id="annResults"></div>
+  </section>
+
+  <!-- ES 文本检索面板 -->
+  <section class="tab-panel" id="panel-es" aria-label="ES 文本检索">
+    <div class="toolbar">
+      <div class="field">
+        <label for="esIndex">索引名</label>
+        <input id="esIndex" type="text" autocomplete="off" />
+      </div>
+      <div class="field q-wrap">
+        <label for="esQ">检索关键词</label>
+        <input id="esQ" type="text" placeholder="标题、search_text、SKU 等" />
+      </div>
+      <div class="field">
+        <label for="esSize">条数</label>
+        <input id="esSize" type="number" min="1" max="100" value="20" />
+      </div>
+      <button id="esGo" type="button">对比搜索</button>
+    </div>
+    <p id="esHostsLine" class="empty-hint" style="text-align:left;font-size:0.75rem;"></p>
+    <div id="esErr" class="error-msg" hidden></div>
+    <section class="es-smart-panel" id="esSmartPanel" hidden aria-labelledby="smartTitle">
+      <h3 id="smartTitle">意图解析与 ES 查询 <span class="llm-elapsed" id="llmElapsed" hidden></span></h3>
+      <div class="query-block-head">
+        <span class="lbl">大模型生成的 ES query</span>
+        <button type="button" class="btn-copy" id="btnCopyExtraction" title="复制 JSON">复制</button>
+      </div>
+      <pre id="extractionView" class="json-pre">{}</pre>
+      <p class="llm-err" id="llmErrLine" hidden></p>
+      <p class="llm-hint" id="llmHint"></p>
+      <div class="es-query-grid" style="margin-top:0.75rem">
+        <div>
+          <div class="query-block-head">
+            <span class="lbl" id="lblEsL">直接文本检索</span>
+            <button type="button" class="btn-copy" id="btnCopyEsL" title="复制 JSON">复制</button>
+          </div>
+          <pre id="esQueryLeft" class="json-pre">{}</pre>
+        </div>
+        <div>
+          <div class="query-block-head">
+            <span class="lbl" id="lblEsR">大模型解析后检索</span>
+            <button type="button" class="btn-copy" id="btnCopyEsR" title="复制 JSON">复制</button>
+          </div>
+          <pre id="esQueryRight" class="json-pre">{}</pre>
+        </div>
+      </div>
+    </section>
+    <div class="es-results-grid">
+      <section class="es-col" aria-labelledby="hL">
+        <div class="es-col-head" id="hL">直接文本检索<div class="es-col-meta" id="metaL"></div></div>
+        <div class="es-col-body" id="bodyL"></div>
+      </section>
+      <section class="es-col" aria-labelledby="hR">
+        <div class="es-col-head" id="hR">大模型解析后检索<div class="es-col-meta" id="metaR"></div></div>
+        <div class="es-col-body" id="bodyR"></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- Milvus hybrid 检索面板 -->
+  <section class="tab-panel" id="panel-milvus" aria-label="Milvus hybrid 检索">
+    <div class="toolbar">
+      <div class="field" style="flex:1 1 100%;">
+        <label for="mvQ">检索词</label>
+        <input id="mvQ" type="text" placeholder="如：白色T恤 男 春季 300元以下" />
+      </div>
+      <div class="field">
+        <label for="mvTopK">Top N</label>
+        <input id="mvTopK" type="number" min="1" max="100" value="20" />
+      </div>
+      <div class="field">
+        <label for="mvKwW">kw_w</label>
+        <input id="mvKwW" type="number" step="0.05" min="0" value="0.2" />
+      </div>
+      <div class="field">
+        <label for="mvSemW">sem_w</label>
+        <input id="mvSemW" type="number" step="0.05" min="0" value="0.8" />
+      </div>
+      <div class="field">
+        <label for="mvRanker">ranker</label>
+        <select id="mvRanker">
+          <option value="rrf">rrf</option>
+          <option value="weighted">weighted</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1 1 50%;">
+        <label for="mvExpr">过滤 expr (可选)</label>
+        <input id="mvExpr" type="text" placeholder='如 gender=="男" && price<=500' />
+      </div>
+      <div class="field">
+        <label><input id="mvSkipRewrite" type="checkbox" checked /> skip_rewrite</label>
+      </div>
+      <button id="mvGo" type="button">三路检索</button>
+    </div>
+    <p id="mvCfgLine" class="empty-hint" style="text-align:left;font-size:0.75rem;"></p>
+    <div id="mvErr" class="error-msg" hidden></div>
+    <section class="es-smart-panel" id="mvRewritePanel" hidden>
+      <h3>查询改写预览</h3>
+      <pre id="mvRewriteView" class="json-pre">{}</pre>
+    </section>
+    <div class="mv-grid">
+      <section class="es-col">
+        <div class="es-col-head">关键词 BM25<div class="es-col-meta" id="mvMetaKw"></div></div>
+        <div class="es-col-body" id="mvBodyKw"></div>
+      </section>
+      <section class="es-col">
+        <div class="es-col-head">语义 Dense<div class="es-col-meta" id="mvMetaSem"></div></div>
+        <div class="es-col-body" id="mvBodySem"></div>
+      </section>
+      <section class="es-col">
+        <div class="es-col-head">混合 Hybrid<div class="es-col-meta" id="mvMetaHyb"></div></div>
+        <div class="es-col-body" id="mvBodyHyb"></div>
+      </section>
+    </div>
+  </section>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    /* ── 主题切换 ── */
+    const THEME_KEY = 'fila_agent_html_theme';
+    function applyTheme(theme) {
+      document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+      const btn = $('btnTheme');
+      if (btn) {
+        const isLight = theme === 'light';
+        btn.setAttribute('aria-label', isLight ? '切换到黑夜模式' : '切换到白天模式');
+        btn.title = isLight ? '切换到黑夜模式' : '切换到白天模式';
+      }
+    }
+    function toggleTheme() {
+      const cur = document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+      const next = cur === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+      localStorage.setItem(THEME_KEY, next);
+    }
+    $('btnTheme')?.addEventListener('click', toggleTheme);
+
+    /* ── Tab 切换 ── */
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+        $('panel-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    /* ── 工具函数 ── */
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/'/g, '&#39;');
+    }
+    function prettyJson(obj) {
+      try { return JSON.stringify(obj, null, 2); } catch { return String(obj); }
+    }
+
+    let llmModelHint = '';
+
+    /* ── ANN 检索 ── */
+    let annObjectUrl = '';
+
+    async function loadAnnStatus() {
+      try {
+        const r = await fetch('/api/search-debug/ann/status');
+        const j = await r.json();
+        if (j.indexes && j.indexes.length) {
+          const labels = j.indexes.map((ix) => ix.label || ix.collection || ix.id).join(', ');
+          $('annStatus').textContent = `已连接索引: ${labels} (${j.index_count} 个)`;
+        } else {
+          $('annStatus').textContent = 'ANN 索引未初始化或未配置';
+        }
+      } catch {
+        $('annStatus').textContent = '无法获取 ANN 索引状态';
+      }
+    }
+    loadAnnStatus();
+
+    $('annFile').addEventListener('change', () => {
+      $('annErr').hidden = true;
+      if (annObjectUrl) { URL.revokeObjectURL(annObjectUrl); annObjectUrl = ''; }
+      const f = $('annFile').files?.[0];
+      if (!f) {
+        $('annPreview').hidden = true;
+        return;
+      }
+      annObjectUrl = URL.createObjectURL(f);
+      $('annPreview').innerHTML = `<img src="${annObjectUrl}" alt="查询预览" />`;
+      $('annPreview').hidden = false;
+    });
+
+    function renderAnnResults(data) {
+      const container = $('annResults');
+      const indexes = data.indexes || [];
+      if (indexes.length === 0) {
+        container.innerHTML = '<p class="empty-hint">无结果</p>';
+        return;
+      }
+      if (indexes.length === 1) {
+        // 单列展示
+        const ix = indexes[0];
+        let html = `<h3 style="margin:0 0 8px;font-size:0.9rem;">${escapeHtml(ix.label)}`;
+        if (ix.embedding_model) html += ` · ${escapeHtml(ix.embedding_model)}`;
+        html += '</h3>';
+        if (ix.error) {
+          html += `<div class="error-msg">${escapeHtml(ix.error)}</div>`;
+        }
+        html += renderNeighborsGrid(ix.neighbors || []);
+        container.innerHTML = html;
+      } else {
+        // 双列对比
+        let html = '<div class="dual-compare">';
+        indexes.forEach((ix, i) => {
+          html += '<div class="dual-col">';
+          html += `<h3>${escapeHtml(ix.label)}</h3>`;
+          if (ix.embedding_model) {
+            html += `<p class="subhead">provider: ${escapeHtml(ix.embedding_provider)} · model: ${escapeHtml(ix.embedding_model)}</p>`;
+          }
+          if (ix.error) {
+            html += `<div class="error-msg">${escapeHtml(ix.error)}</div>`;
+          }
+          html += renderNeighborsGrid(ix.neighbors || []);
+          html += '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      }
+    }
+
+    function renderNeighborsGrid(neighbors) {
+      if (!neighbors.length) return '<p class="empty-hint">无命中</p>';
+      let html = '<div class="results-grid">';
+      for (const n of neighbors) {
+        const href = n.detail_url || '#';
+        const img = n.product_image
+          ? `<img src="${escapeAttr(n.product_image)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+          : '';
+        html += `<div class="result-card">
+          <a href="${escapeAttr(href)}" target="_blank" rel="noopener">
+            ${img}
+            <div class="meta">
+              <div class="sku">${escapeHtml(n.sku_id)}</div>
+              <div class="title">${escapeHtml(n.product_name || '')}</div>
+              <div class="dist">distance: ${Number(n.distance).toFixed(6)}</div>
+            </div>
+          </a>
+        </div>`;
+      }
+      html += '</div>';
+      return html;
+    }
+
+    $('annRun').addEventListener('click', async () => {
+      $('annErr').hidden = true;
+      $('annResults').innerHTML = '';
+      const f = $('annFile').files?.[0];
+      if (!f) {
+        $('annErr').hidden = false;
+        $('annErr').textContent = '请先选择图片。';
+        return;
+      }
+      const topK = Number($('annTopK').value || '10');
+      if (!Number.isFinite(topK) || topK < 1 || topK > 100) {
+        $('annErr').hidden = false;
+        $('annErr').textContent = 'Top N 需要在 1~100 之间。';
+        return;
+      }
+      $('annRun').disabled = true;
+      try {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result;
+            const comma = dataUrl.indexOf(',');
+            resolve(comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl);
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(f);
+        });
+        const resp = await fetch('/api/search-debug/ann/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image_base64: base64,
+            image_content_type: f.type || 'image/jpeg',
+            top_k: topK,
+          }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          $('annErr').hidden = false;
+          $('annErr').textContent = `请求失败 (${resp.status}): ${data.detail || resp.statusText}`;
+          return;
+        }
+        renderAnnResults(data);
+      } catch (e) {
+        $('annErr').hidden = false;
+        $('annErr').textContent = String(e && e.message ? e.message : e);
+      } finally {
+        $('annRun').disabled = false;
+      }
+    });
+
+    /* ── ES 检索 ── */
+    function detailUrl(sku) {
+      if (!sku) return '#';
+      // 同源相对路径（与 outfits-viewer/browse.js 一致），不再依赖已废弃的 outfits_viewer_base
+      return `/outfits-viewer/detail.html?sku=${encodeURIComponent(sku)}`;
+    }
+
+    function renderEsCol(side, data) {
+      const body = $(`body${side}`);
+      const meta = $(`meta${side}`);
+      meta.textContent = '';
+      if (!data.ok) {
+        body.innerHTML = `<div class="error-msg">${escapeHtml(data.error || '未知错误')}</div>`;
+        return;
+      }
+      const t = data.total != null ? `共 ${data.total} 条` : '';
+      const tk = data.took_ms != null ? `耗时 ${data.took_ms} ms` : '';
+      meta.textContent = [data.index, t, tk].filter(Boolean).join(' · ');
+      const hits = data.hits || [];
+      if (!hits.length) {
+        body.innerHTML = '<p class="empty-hint">无命中</p>';
+        return;
+      }
+      let html = '<div class="es-cards">';
+      for (const h of hits) {
+        const sku = h.sku_id || '';
+        const href = detailUrl(sku);
+        const img = h.image_url
+          ? `<img src="${escapeAttr(h.image_url)}" alt="" loading="lazy" />`
+          : '<span class="ph">无图</span>';
+        const title = h.title || '';
+        const score = h.score != null && h.score !== undefined
+          ? `<div class="score">score: ${Number(h.score).toFixed(3)}</div>`
+          : '';
+        html += `<div class="es-card">
+          <a href="${escapeAttr(href)}" target="_blank" rel="noopener">
+            <div class="thumb">${img}</div>
+            <div class="card-cap">
+              <div class="sku">${escapeHtml(sku || '(无 SKU)')}</div>
+              <div class="tit">${escapeHtml(title)}</div>
+              ${score}
+            </div>
+          </a>
+        </div>`;
+      }
+      html += '</div>';
+      body.innerHTML = html;
+    }
+
+    function renderSmartPanel(data) {
+      $('extractionView').textContent = prettyJson(data.extraction || {});
+      const elapsedEl = $('llmElapsed');
+      if (data.llm_elapsed_ms != null) {
+        elapsedEl.hidden = false;
+        const ms = Number(data.llm_elapsed_ms);
+        elapsedEl.textContent = ms >= 1000 ? `意图解析 ${(ms / 1000).toFixed(2)} s` : `意图解析 ${ms} ms`;
+      } else {
+        elapsedEl.hidden = true;
+      }
+      const errEl = $('llmErrLine');
+      if (data.llm_error) {
+        errEl.hidden = false;
+        let t = data.llm_error;
+        if (data.llm_raw_excerpt) t += '\n\n原始片段：\n' + data.llm_raw_excerpt;
+        errEl.textContent = t;
+      } else {
+        errEl.hidden = true;
+      }
+      $('esQueryLeft').textContent = prettyJson(data.es_query_left || {});
+      $('esQueryRight').textContent = prettyJson(data.es_query_right || {});
+      const hint = $('llmHint');
+      if (data.llm_enabled) {
+        hint.textContent = llmModelHint ? `已调用大模型（${llmModelHint}）` : '已调用大模型';
+      } else {
+        hint.textContent = '大模型未启用或未配置密钥；已使用宽松 multi_match 回退检索。';
+      }
+    }
+
+    async function loadEsConfig() {
+      try {
+        const r = await fetch('/api/search-debug/es/config');
+        const j = await r.json();
+        $('esIndex').value = j.index_default || '';
+        if (j.default_size) $('esSize').value = String(j.default_size);
+        llmModelHint = j.llm_model || '';
+        const ix = $('esIndex').value || j.index_default || '';
+        $('lblEsL').textContent = '直接文本 · ' + ix;
+        $('lblEsR').textContent = '意图解析 · ' + ix;
+        const hosts = j.elasticsearch_hosts;
+        const fromEnv = j.elasticsearch_hosts_from_es_hosts_env;
+        $('esHostsLine').textContent = Array.isArray(hosts)
+          ? `ES: ${hosts.join(', ')}${fromEnv ? '（来自环境变量 ES_HOSTS）' : ''}`
+          : '';
+      } catch {}
+    }
+    loadEsConfig();
+
+    async function runEsSearch() {
+      const btn = $('esGo');
+      btn.disabled = true;
+      $('esErr').hidden = true;
+      try {
+        const payload = {
+          q: $('esQ').value,
+          index: $('esIndex').value.trim(),
+          size: Number($('esSize').value) || 20,
+        };
+        const r = await fetch('/api/search-debug/es/search-smart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) {
+          const t = await r.text();
+          throw new Error(t || r.statusText);
+        }
+        const j = await r.json();
+        const ix = j.index || payload.index || '';
+        $('lblEsL').textContent = '直接文本 · ' + ix;
+        $('lblEsR').textContent = '意图解析 · ' + ix;
+        $('esSmartPanel').hidden = false;
+        renderSmartPanel(j);
+        renderEsCol('L', j.left);
+        renderEsCol('R', j.right);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        $('esErr').hidden = false;
+        $('esErr').textContent = msg;
+        $('bodyL').innerHTML = '';
+        $('bodyR').innerHTML = '';
+        $('metaL').textContent = '';
+        $('metaR').textContent = '';
+        $('esSmartPanel').hidden = true;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    $('esGo').addEventListener('click', runEsSearch);
+    $('esQ').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') runEsSearch(); });
+
+    /* ── 复制按钮 ── */
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch {}
+      document.body.removeChild(ta);
+      return ok;
+    }
+    function bindCopy(btnId, preId) {
+      const btn = $(btnId);
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        const pre = $(preId);
+        const text = (pre && pre.textContent) ? pre.textContent : '';
+        let ok = false;
+        if (navigator.clipboard && window.isSecureContext) {
+          try { await navigator.clipboard.writeText(text); ok = true; } catch {}
+        }
+        if (!ok) { ok = fallbackCopy(text); }
+        btn.textContent = ok ? '已复制' : '失败';
+        setTimeout(() => { btn.textContent = '复制'; }, 1500);
+      });
+    }
+    bindCopy('btnCopyExtraction', 'extractionView');
+    bindCopy('btnCopyEsL', 'esQueryLeft');
+    bindCopy('btnCopyEsR', 'esQueryRight');
+
+    /* ── Milvus hybrid 检索 ── */
+    function mvDetailUrl(sku) {
+      if (!sku) return '#';
+      // 同源相对路径（与 outfits-viewer/browse.js 一致），不再依赖已废弃的 outfits_viewer_base
+      return `/outfits-viewer/detail.html?sku=${encodeURIComponent(sku)}`;
+    }
+
+    async function loadMilvusConfig() {
+      try {
+        const r = await fetch('/api/search-debug/milvus/config');
+        const j = await r.json();
+        const parts = [];
+        if (j.collection) parts.push(j.collection);
+        parts.push(`ranker=${j.ranker} kw=${j.keyword_weight} sem=${j.semantic_weight} limit=${j.default_limit}`);
+        if (j.hybrid_supported === false) parts.push('⚠ 本地 Lite 不支持 BM25，hybrid 将失败');
+        $('mvCfgLine').textContent = parts.join(' · ');
+        if (j.default_limit) $('mvTopK').value = String(j.default_limit);
+        if (j.keyword_weight != null) $('mvKwW').value = String(j.keyword_weight);
+        if (j.semantic_weight != null) $('mvSemW').value = String(j.semantic_weight);
+        if (j.ranker) $('mvRanker').value = j.ranker;
+      } catch {
+        $('mvCfgLine').textContent = '无法获取 Milvus 配置';
+      }
+    }
+    loadMilvusConfig();
+
+    function renderMilvusCol(bodyId, metaId, data) {
+      const body = $(bodyId);
+      const metaEl = $(metaId);
+      metaEl.textContent = '';
+      if (data.error) {
+        body.innerHTML = `<div class="error-msg">${escapeHtml(data.error)}</div>`;
+        metaEl.textContent = data.took_ms != null ? `耗时 ${data.took_ms} ms` : '';
+        return;
+      }
+      const tk = data.took_ms != null ? `耗时 ${data.took_ms} ms` : '';
+      metaEl.textContent = [`${(data.hits || []).length} 条`, tk].filter(Boolean).join(' · ');
+      const hits = data.hits || [];
+      if (!hits.length) {
+        body.innerHTML = '<p class="empty-hint">无命中</p>';
+        return;
+      }
+      let html = '<div class="es-cards">';
+      for (const h of hits) {
+        const sku = h.sku_id || '';
+        const href = mvDetailUrl(sku);
+        const img = h.tryon_image
+          ? `<img src="${escapeAttr(h.tryon_image)}" alt="" loading="lazy" />`
+          : '<span class="ph">无图</span>';
+        const title = h.product_name_short || h.title || h.goods_sn || '';
+        const cat = h.category_l1 || '';
+        const gender = Array.isArray(h.gender) ? h.gender.join('/') : (h.gender || '');
+        const price = (h.price != null && h.price !== '') ? `¥${h.price}` : '';
+        const onsell = (h.onsell === 1 || h.onsell === '1') ? '在售'
+          : ((h.onsell === 0 || h.onsell === '0') ? '下架' : '');
+        const score = h.score != null ? `<div class="score">score: ${Number(h.score).toFixed(4)}</div>` : '';
+        const meta = [cat, gender, price, onsell].filter(Boolean).join(' · ');
+        html += `<div class="es-card">
+          <a href="${escapeAttr(href)}" target="_blank" rel="noopener">
+            <div class="thumb">${img}</div>
+            <div class="card-cap">
+              <div class="sku">${escapeHtml(sku || '(无 SKU)')}</div>
+              <div class="tit">${escapeHtml(title)}</div>
+              <div class="empty-hint" style="font-size:0.7rem;margin:0.15rem 0;">${escapeHtml(meta)}</div>
+              ${score}
+            </div>
+          </a>
+        </div>`;
+      }
+      html += '</div>';
+      body.innerHTML = html;
+    }
+
+    async function runMilvusSearch() {
+      const btn = $('mvGo');
+      btn.disabled = true;
+      $('mvErr').hidden = true;
+      try {
+        const payload = {
+          query: $('mvQ').value,
+          top_k: Number($('mvTopK').value) || 20,
+          kw_w: $('mvKwW').value === '' ? null : Number($('mvKwW').value),
+          sem_w: $('mvSemW').value === '' ? null : Number($('mvSemW').value),
+          ranker: $('mvRanker').value,
+          expr: $('mvExpr').value.trim() || null,
+          skip_rewrite: $('mvSkipRewrite').checked,
+        };
+        const r = await fetch('/api/search-debug/milvus/hybrid-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) {
+          const t = await r.text();
+          throw new Error(t || r.statusText);
+        }
+        const j = await r.json();
+        const rp = $('mvRewritePanel');
+        if (j.rewrite) {
+          rp.hidden = false;
+          $('mvRewriteView').textContent = prettyJson(j.rewrite);
+        } else {
+          rp.hidden = true;
+        }
+        renderMilvusCol('mvBodyKw', 'mvMetaKw', j.keyword || {});
+        renderMilvusCol('mvBodySem', 'mvMetaSem', j.semantic || {});
+        renderMilvusCol('mvBodyHyb', 'mvMetaHyb', j.hybrid || {});
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        $('mvErr').hidden = false;
+        $('mvErr').textContent = msg;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    $('mvGo').addEventListener('click', runMilvusSearch);
+    $('mvQ').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') runMilvusSearch(); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,618 @@
+# FILA SKU 搭配色系配对统计 (下装→上装)
+# 数据源: data/tables/fila_sku_outfit_colors.csv
+# 字段: anchor_count(锚点统计数) / primary_companions(首选搭配) / allowed_companions(允许搭配) / companions(明细)
+# 锚点角色: 下装 / 伴侣角色: 上装; 共 12 个 下装 色系, 8580/51256 条有效记录 (跳过 42324 条错误记录)
+# 生成脚本: scripts/extract_fila_sku_color_pairing.py
+
+meta:
+  analyzed_records: 8580
+  description: FILA SKU 搭配色系配对统计 (下装→上装)
+  extracted_at: '2026-07-04T10:36:51.178356+00:00'
+  skipped_records: 42324
+  source: data/tables/fila_sku_outfit_colors.csv
+  thresholds:
+    allowed_rate: 0.02
+    primary_rate: 0.08
+  total_records: 51256
+pairing_rules:
+  多色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 黄色系
+    anchor_count: 29
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 14
+      rate: 0.4828
+    - color_series: 黑色系
+      confidence: medium
+      count: 3
+      rate: 0.1034
+    - color_series: 蓝色系
+      confidence: low
+      count: 2
+      rate: 0.069
+    - color_series: 黄色系
+      confidence: low
+      count: 2
+      rate: 0.069
+    primary_companions:
+    - 白色系
+    - 黑色系
+  棕色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 绿色系
+    - 灰色系
+    - 黄色系
+    - 粉色系
+    anchor_count: 479
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 145
+      rate: 0.3027
+    - color_series: 黑色系
+      confidence: high
+      count: 124
+      rate: 0.2589
+    - color_series: 蓝色系
+      confidence: medium
+      count: 50
+      rate: 0.1044
+    - color_series: 绿色系
+      confidence: low
+      count: 25
+      rate: 0.0522
+    - color_series: 灰色系
+      confidence: low
+      count: 16
+      rate: 0.0334
+    - color_series: 黄色系
+      confidence: low
+      count: 10
+      rate: 0.0209
+    - color_series: 粉色系
+      confidence: low
+      count: 10
+      rate: 0.0209
+    - color_series: 橙色系
+      confidence: rare
+      count: 7
+      rate: 0.0146
+    - color_series: 紫色系
+      confidence: rare
+      count: 3
+      rate: 0.0063
+    - color_series: 红色系
+      confidence: rare
+      count: 3
+      rate: 0.0063
+    - color_series: 多色系
+      confidence: rare
+      count: 2
+      rate: 0.0042
+    primary_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+  橙色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 绿色系
+    - 红色系
+    - 粉色系
+    - 紫色系
+    - 灰色系
+    anchor_count: 36
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 12
+      rate: 0.3333
+    - color_series: 黑色系
+      confidence: medium
+      count: 7
+      rate: 0.1944
+    - color_series: 蓝色系
+      confidence: medium
+      count: 3
+      rate: 0.0833
+    - color_series: 绿色系
+      confidence: medium
+      count: 3
+      rate: 0.0833
+    - color_series: 红色系
+      confidence: low
+      count: 2
+      rate: 0.0556
+    - color_series: 粉色系
+      confidence: low
+      count: 2
+      rate: 0.0556
+    - color_series: 紫色系
+      confidence: low
+      count: 1
+      rate: 0.0278
+    - color_series: 灰色系
+      confidence: low
+      count: 1
+      rate: 0.0278
+    primary_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 绿色系
+  灰色系:
+    allowed_companions:
+    - 黑色系
+    - 白色系
+    - 蓝色系
+    - 粉色系
+    - 绿色系
+    - 黄色系
+    anchor_count: 781
+    companions:
+    - color_series: 黑色系
+      confidence: high
+      count: 196
+      rate: 0.251
+    - color_series: 白色系
+      confidence: high
+      count: 192
+      rate: 0.2458
+    - color_series: 蓝色系
+      confidence: medium
+      count: 85
+      rate: 0.1088
+    - color_series: 粉色系
+      confidence: low
+      count: 46
+      rate: 0.0589
+    - color_series: 绿色系
+      confidence: low
+      count: 45
+      rate: 0.0576
+    - color_series: 黄色系
+      confidence: low
+      count: 17
+      rate: 0.0218
+    - color_series: 紫色系
+      confidence: rare
+      count: 12
+      rate: 0.0154
+    - color_series: 橙色系
+      confidence: rare
+      count: 11
+      rate: 0.0141
+    - color_series: 红色系
+      confidence: rare
+      count: 7
+      rate: 0.009
+    - color_series: 棕色系
+      confidence: rare
+      count: 6
+      rate: 0.0077
+    - color_series: 多色系
+      confidence: rare
+      count: 1
+      rate: 0.0013
+    primary_companions:
+    - 黑色系
+    - 白色系
+    - 蓝色系
+  白色系:
+    allowed_companions:
+    - 黑色系
+    - 蓝色系
+    - 粉色系
+    - 绿色系
+    - 黄色系
+    - 红色系
+    anchor_count: 1120
+    companions:
+    - color_series: 黑色系
+      confidence: high
+      count: 254
+      rate: 0.2268
+    - color_series: 蓝色系
+      confidence: medium
+      count: 151
+      rate: 0.1348
+    - color_series: 粉色系
+      confidence: low
+      count: 87
+      rate: 0.0777
+    - color_series: 绿色系
+      confidence: low
+      count: 62
+      rate: 0.0554
+    - color_series: 黄色系
+      confidence: low
+      count: 32
+      rate: 0.0286
+    - color_series: 红色系
+      confidence: low
+      count: 23
+      rate: 0.0205
+    - color_series: 灰色系
+      confidence: rare
+      count: 20
+      rate: 0.0179
+    - color_series: 紫色系
+      confidence: rare
+      count: 20
+      rate: 0.0179
+    - color_series: 棕色系
+      confidence: rare
+      count: 19
+      rate: 0.017
+    - color_series: 橙色系
+      confidence: rare
+      count: 9
+      rate: 0.008
+    - color_series: 多色系
+      confidence: rare
+      count: 5
+      rate: 0.0045
+    primary_companions:
+    - 黑色系
+    - 蓝色系
+  粉色系:
+    allowed_companions:
+    - 白色系
+    - 蓝色系
+    - 黑色系
+    - 灰色系
+    - 绿色系
+    anchor_count: 173
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 78
+      rate: 0.4509
+    - color_series: 蓝色系
+      confidence: low
+      count: 10
+      rate: 0.0578
+    - color_series: 黑色系
+      confidence: low
+      count: 7
+      rate: 0.0405
+    - color_series: 灰色系
+      confidence: low
+      count: 7
+      rate: 0.0405
+    - color_series: 绿色系
+      confidence: low
+      count: 4
+      rate: 0.0231
+    - color_series: 多色系
+      confidence: rare
+      count: 2
+      rate: 0.0116
+    - color_series: 紫色系
+      confidence: rare
+      count: 2
+      rate: 0.0116
+    - color_series: 红色系
+      confidence: rare
+      count: 1
+      rate: 0.0058
+    - color_series: 棕色系
+      confidence: rare
+      count: 1
+      rate: 0.0058
+    primary_companions:
+    - 白色系
+  紫色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 粉色系
+    - 灰色系
+    - 绿色系
+    anchor_count: 109
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 42
+      rate: 0.3853
+    - color_series: 黑色系
+      confidence: medium
+      count: 13
+      rate: 0.1193
+    - color_series: 蓝色系
+      confidence: low
+      count: 5
+      rate: 0.0459
+    - color_series: 粉色系
+      confidence: low
+      count: 5
+      rate: 0.0459
+    - color_series: 灰色系
+      confidence: low
+      count: 4
+      rate: 0.0367
+    - color_series: 绿色系
+      confidence: low
+      count: 4
+      rate: 0.0367
+    - color_series: 多色系
+      confidence: rare
+      count: 1
+      rate: 0.0092
+    primary_companions:
+    - 白色系
+    - 黑色系
+  红色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 灰色系
+    anchor_count: 93
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 36
+      rate: 0.3871
+    - color_series: 黑色系
+      confidence: medium
+      count: 12
+      rate: 0.129
+    - color_series: 蓝色系
+      confidence: low
+      count: 5
+      rate: 0.0538
+    - color_series: 灰色系
+      confidence: low
+      count: 2
+      rate: 0.0215
+    - color_series: 紫色系
+      confidence: rare
+      count: 1
+      rate: 0.0108
+    - color_series: 粉色系
+      confidence: rare
+      count: 1
+      rate: 0.0108
+    - color_series: 绿色系
+      confidence: rare
+      count: 1
+      rate: 0.0108
+    primary_companions:
+    - 白色系
+    - 黑色系
+  绿色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 黄色系
+    - 灰色系
+    - 橙色系
+    anchor_count: 350
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 137
+      rate: 0.3914
+    - color_series: 黑色系
+      confidence: medium
+      count: 63
+      rate: 0.18
+    - color_series: 蓝色系
+      confidence: low
+      count: 17
+      rate: 0.0486
+    - color_series: 黄色系
+      confidence: low
+      count: 15
+      rate: 0.0429
+    - color_series: 灰色系
+      confidence: low
+      count: 10
+      rate: 0.0286
+    - color_series: 橙色系
+      confidence: low
+      count: 8
+      rate: 0.0229
+    - color_series: 棕色系
+      confidence: rare
+      count: 6
+      rate: 0.0171
+    - color_series: 粉色系
+      confidence: rare
+      count: 3
+      rate: 0.0086
+    - color_series: 紫色系
+      confidence: rare
+      count: 3
+      rate: 0.0086
+    - color_series: 多色系
+      confidence: rare
+      count: 2
+      rate: 0.0057
+    - color_series: 红色系
+      confidence: rare
+      count: 1
+      rate: 0.0029
+    primary_companions:
+    - 白色系
+    - 黑色系
+  蓝色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 粉色系
+    - 灰色系
+    - 黄色系
+    - 红色系
+    - 绿色系
+    - 橙色系
+    anchor_count: 1144
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 444
+      rate: 0.3881
+    - color_series: 黑色系
+      confidence: low
+      count: 83
+      rate: 0.0726
+    - color_series: 粉色系
+      confidence: low
+      count: 59
+      rate: 0.0516
+    - color_series: 灰色系
+      confidence: low
+      count: 51
+      rate: 0.0446
+    - color_series: 黄色系
+      confidence: low
+      count: 35
+      rate: 0.0306
+    - color_series: 红色系
+      confidence: low
+      count: 34
+      rate: 0.0297
+    - color_series: 绿色系
+      confidence: low
+      count: 31
+      rate: 0.0271
+    - color_series: 橙色系
+      confidence: low
+      count: 25
+      rate: 0.0219
+    - color_series: 紫色系
+      confidence: rare
+      count: 13
+      rate: 0.0114
+    - color_series: 棕色系
+      confidence: rare
+      count: 12
+      rate: 0.0105
+    - color_series: 多色系
+      confidence: rare
+      count: 10
+      rate: 0.0087
+    primary_companions:
+    - 白色系
+  黄色系:
+    allowed_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+    - 粉色系
+    - 绿色系
+    - 灰色系
+    anchor_count: 134
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 39
+      rate: 0.291
+    - color_series: 黑色系
+      confidence: high
+      count: 30
+      rate: 0.2239
+    - color_series: 蓝色系
+      confidence: medium
+      count: 12
+      rate: 0.0896
+    - color_series: 粉色系
+      confidence: low
+      count: 8
+      rate: 0.0597
+    - color_series: 绿色系
+      confidence: low
+      count: 8
+      rate: 0.0597
+    - color_series: 灰色系
+      confidence: low
+      count: 3
+      rate: 0.0224
+    - color_series: 紫色系
+      confidence: rare
+      count: 2
+      rate: 0.0149
+    - color_series: 多色系
+      confidence: rare
+      count: 1
+      rate: 0.0075
+    - color_series: 棕色系
+      confidence: rare
+      count: 1
+      rate: 0.0075
+    primary_companions:
+    - 白色系
+    - 黑色系
+    - 蓝色系
+  黑色系:
+    allowed_companions:
+    - 白色系
+    - 蓝色系
+    - 灰色系
+    - 粉色系
+    - 绿色系
+    - 红色系
+    - 黄色系
+    - 棕色系
+    anchor_count: 4132
+    companions:
+    - color_series: 白色系
+      confidence: high
+      count: 1450
+      rate: 0.3509
+    - color_series: 蓝色系
+      confidence: medium
+      count: 497
+      rate: 0.1203
+    - color_series: 灰色系
+      confidence: low
+      count: 240
+      rate: 0.0581
+    - color_series: 粉色系
+      confidence: low
+      count: 230
+      rate: 0.0557
+    - color_series: 绿色系
+      confidence: low
+      count: 217
+      rate: 0.0525
+    - color_series: 红色系
+      confidence: low
+      count: 167
+      rate: 0.0404
+    - color_series: 黄色系
+      confidence: low
+      count: 121
+      rate: 0.0293
+    - color_series: 棕色系
+      confidence: low
+      count: 87
+      rate: 0.0211
+    - color_series: 紫色系
+      confidence: rare
+      count: 82
+      rate: 0.0198
+    - color_series: 橙色系
+      confidence: rare
+      count: 81
+      rate: 0.0196
+    - color_series: 多色系
+      confidence: rare
+      count: 50
+      rate: 0.0121
+    primary_companions:
+    - 白色系
+    - 蓝色系

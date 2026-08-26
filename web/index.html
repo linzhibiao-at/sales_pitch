@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FILA 穿搭推荐 · Debug</title>
+    <link rel="stylesheet" href="/web/styles.css?v=20260701-present" />
+    <script>
+      (function () {
+        var saved = localStorage.getItem('fila_agent_html_theme');
+        if (saved === 'light' || saved === 'dark') {
+          document.documentElement.dataset.theme = saved;
+        } else {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>FILA 穿搭推荐</h1>
+        <p class="subtitle">HTML 调试台 · 对接同目录 FastAPI <code>/chat</code> SSE</p>
+      </div>
+      <nav class="header-actions" aria-label="页面操作">
+        <button
+          id="btnTheme"
+          type="button"
+          class="btn theme-toggle"
+          aria-label="切换到白天模式"
+          title="切换白天/黑夜模式"
+        >
+          <span class="theme-icon theme-icon-sun" aria-hidden="true">☀</span>
+          <span class="theme-icon theme-icon-moon" aria-hidden="true">☽</span>
+        </button>
+        <div class="header-links">
+          <a
+            href="/outfits-viewer/"
+            target="_blank"
+            rel="noopener"
+          >穿搭浏览</a>
+          <a
+            href="/products"
+            target="_blank"
+            rel="noopener"
+          >商品浏览</a>
+          <a href="/eval/review.html" target="_blank" rel="noopener">批量评测</a>
+          <a href="/web/audit.html" target="_blank" rel="noopener">请求审计</a>
+          <a href="/health" target="_blank" rel="noopener">Health</a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="panel panel-input panel-wide" aria-label="输入">
+        <h2>对话输入</h2>
+        <div class="input-body">
+        <label class="field input-col input-col-message">
+          <span>需求描述</span>
+          <textarea
+            id="message"
+            rows="3"
+            placeholder="例如：搭一下黑色裤子"
+          ></textarea>
+        </label>
+        <label class="field input-col input-col-image">
+          <span>上传图片（可选）</span>
+          <input id="imageFile" type="file" accept="image/*" />
+          <div id="imagePreview" class="image-preview hidden"></div>
+        </label>
+        <label class="field input-col input-col-image">
+          <span>模特图/自拍（可选）</span>
+          <input id="tryonPersonFile" type="file" accept="image/*" />
+          <div id="tryonPersonPreview" class="image-preview hidden"></div>
+        </label>
+        <label class="field input-col input-col-sku">
+          <span>锚定 SKU（可选）</span>
+          <input id="selectedSku" type="text" placeholder="例如 T61W433104F-WT" />
+        </label>
+        <div class="input-col input-col-toggles">
+          <span>调试开关</span>
+          <div class="toggle-group">
+            <label class="toggle-label">
+              <span>LLM排序和理由</span>
+              <input id="toggleLlmRankReason" type="checkbox" class="toggle-input" checked />
+              <span class="toggle-switch"></span>
+            </label>
+            <label class="toggle-label">
+              <span>虚拟试穿</span>
+              <input id="toggleTryon" type="checkbox" class="toggle-input" />
+              <span class="toggle-switch"></span>
+            </label>
+          </div>
+          <label class="toggle-label" style="margin-top:4px">
+            <span>LLM 模型</span>
+            <select id="modelSelect" class="model-select"></select>
+          </label>
+        </div>
+        <div class="input-col input-col-actions">
+          <span class="input-actions-label">操作</span>
+          <div class="actions">
+            <button id="btnSubmit" type="button" class="btn primary">开始推荐</button>
+            <button id="btnClear" type="button" class="btn ghost">清空</button>
+          </div>
+          <p id="statusLine" class="status-line">就绪</p>
+          <p class="meta-line">
+            Session: <code id="sessionId">—</code>
+          </p>
+        </div>
+        </div>
+      </section>
+
+      <section class="panel panel-pipeline panel-wide" aria-label="管线阶段">
+        <h2>推荐管线</h2>
+        <ol id="pipelineSteps" class="pipeline-steps"></ol>
+        <p id="pipelineTotal" class="pipeline-total hidden">总耗时 —</p>
+      </section>
+
+      <section id="intentDebugPanel" class="panel panel-intent-debug panel-wide hidden" aria-label="意图调试">
+        <details>
+          <summary><h2 style="display:inline">意图调试</h2></summary>
+          <div class="intent-debug-content"></div>
+        </details>
+      </section>
+
+      <section id="esDebugPanel" class="panel panel-intent-debug panel-wide hidden" aria-label="ES 调试">
+        <details>
+          <summary><h2 style="display:inline">ES Query 调试</h2></summary>
+          <div class="es-debug-content"></div>
+        </details>
+      </section>
+
+      <section class="panel panel-results panel-wide" aria-label="推荐结果">
+        <h2>搭配结果</h2>
+        <div id="outfitGrid" class="outfit-list"></div>
+      </section>
+
+      <section class="panel panel-debug panel-wide" aria-label="原始事件">
+        <div class="panel-head-row">
+          <h2>SSE 事件日志</h2>
+          <button id="btnCopyEvents" type="button" class="btn ghost small">复制 JSON</button>
+        </div>
+        <pre id="eventLog" class="event-log"></pre>
+      </section>
+    </main>
+
+    <script src="/web/app.js?v=20260701-present2" type="module"></script>
+  </body>
+</html>
