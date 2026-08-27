@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FILA 穿搭推荐系统架构图</title>
+<style>
+  :root {
+    --blue: #2F80ED; --blue-bg: rgba(47,128,237,0.10); --blue-border: rgba(47,128,237,0.30);
+    --green: #27AE60; --green-bg: rgba(39,174,96,0.10); --green-border: rgba(39,174,96,0.30);
+    --purple: #7B61FF; --purple-bg: rgba(123,97,255,0.10); --purple-border: rgba(123,97,255,0.30);
+    --teal: #2D9CDB; --teal-bg: rgba(45,156,219,0.10); --teal-border: rgba(45,156,219,0.30);
+    --orange: #F2994A; --orange-bg: rgba(242,153,74,0.08); --orange-border: rgba(242,153,74,0.35);
+    --red: #EB5757; --red-bg: rgba(235,87,87,0.08); --red-border: rgba(235,87,87,0.30);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #F5F7FA;
+    color: #1E293B;
+    padding: 32px 24px;
+  }
+  .page-title {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .page-title h1 {
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #2563EB, #7B61FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .page-title p {
+    font-size: 13px;
+    color: #64748B;
+    margin-top: 6px;
+  }
+
+  /* 大模块容器 */
+  .layer {
+    border-radius: 16px;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .layer-header {
+    padding: 12px 20px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .layer-header .icon { font-size: 18px; }
+  .layer-header .badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.2);
+    margin-left: auto;
+  }
+  .layer-header-blue { background: linear-gradient(135deg, #2563EB, #3B82F6); }
+  .layer-header-green { background: linear-gradient(135deg, #16A34A, #22C55E); }
+  .layer-header-purple { background: linear-gradient(135deg, #6D28D9, #8B5CF6); }
+  .layer-header-orange { background: linear-gradient(135deg, #D97706, #F59E0B); }
+  .layer-header-teal { background: linear-gradient(135deg, #0284C7, #06B6D4); }
+
+  .layer-body {
+    padding: 16px 20px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* 内部卡片 */
+  .card {
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    flex: 1;
+    min-width: 150px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .icon-bg {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 6px; font-size: 11px; flex-shrink: 0;
+  }
+  .card-desc {
+    font-size: 11px;
+    color: #64748B;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+  .card-code {
+    font-size: 10px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    color: #94A3B8;
+    margin-top: 4px;
+  }
+
+  /* 各层卡片配色 */
+  .layer-blue .card-title { color: #1E3A5F; }
+  .layer-blue .card-title .icon-bg { background: rgba(47,128,237,0.12); }
+  .layer-blue .card { background: #EFF6FF; border-color: #BFDBFE; }
+
+  .layer-green .card-title { color: #065F46; }
+  .layer-green .card-title .icon-bg { background: rgba(39,174,96,0.12); }
+  .layer-green .card { background: #F0FDF4; border-color: #A7F3D0; }
+
+  .layer-purple .card-title { color: #4C1D95; }
+  .layer-purple .card-title .icon-bg { background: rgba(123,97,255,0.12); }
+  .layer-purple .card { background: #F5F3FF; border-color: #DDD6FE; }
+
+  .layer-orange .card-title { color: #D35400; }
+  .layer-orange .card-title .icon-bg { background: rgba(242,153,74,0.14); }
+  .layer-orange .card { background: #FFFBEB; border-color: #FDE68A; }
+
+  .layer-teal .card-title { color: #1E3A5F; }
+  .layer-teal .card-title .icon-bg { background: rgba(45,156,219,0.12); }
+  .layer-teal .card { background: #EEF2FF; border-color: #C7D2FE; }
+
+  /* 标签胶囊 */
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 6px;
+    background: #F3F4F6;
+    color: #6B7280;
+    margin-top: 4px;
+  }
+  .tag-blue { background: rgba(47,128,237,0.10); color: #2F80ED; }
+  .tag-green { background: rgba(39,174,96,0.10); color: #27AE60; }
+  .tag-purple { background: rgba(123,97,255,0.10); color: #7B61FF; }
+  .tag-orange { background: rgba(242,153,74,0.12); color: #D35400; }
+  .tag-teal { background: rgba(45,156,219,0.10); color: #2D9CDB; }
+  .tag-red { background: rgba(235,87,87,0.10); color: #D63031; }
+
+  /* 层间连接箭头 */
+  .layer-arrow {
+    text-align: center;
+    font-size: 18px;
+    color: #94A3B8;
+    line-height: 1;
+    padding: 2px 0;
+  }
+
+  /* 外部依赖 */
+  .external {
+    border-radius: 16px;
+    border: 1.5px dashed #CBD5E1;
+    background: #F8FAFC;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+  }
+  .external-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748B;
+    margin-bottom: 12px;
+  }
+  .external-body {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .external .card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+  }
+  .external .card-title { color: #475569; }
+  .external .card-title .icon-bg { background: rgba(100,116,139,0.12); }
+
+  /* 图例 */
+  .legend {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 12px;
+    color: #64748B;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+  .dot-blue { background: #2F80ED; }
+  .dot-green { background: #27AE60; }
+  .dot-purple { background: #7B61FF; }
+  .dot-orange { background: #F2994A; }
+  .dot-teal { background: #2D9CDB; }
+
+  /* 底部全流程链路 */
+  .bottom-flow {
+    margin-top: 24px;
+    border-radius: 10px;
+    background: linear-gradient(135deg,
+      #F0FDF4 0%,
+      #EFF6FF 25%,
+      #F5F3FF 50%,
+      #EEF2FF 75%,
+      #F0FDF4 100%);
+    border: 1px solid #D1D5DB;
+    padding: 14px 20px;
+  }
+  .bottom-flow-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6B7280;
+    margin-bottom: 8px;
+  }
+  .bottom-flow-steps {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .flow-step {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .flow-step-green  { background: #D1FAE5; color: #065F46; }
+  .flow-step-blue   { background: #DBEAFE; color: #1E3A5F; }
+  .flow-step-purple { background: #EDE9FE; color: #4C1D95; }
+  .flow-step-orange { background: #FEF3C7; color: #92400E; }
+  .flow-step-indigo { background: #E0E7FF; color: #1E3A5F; }
+  .flow-arrow { color: #D1D5DB; font-size: 13px; }
+
+  .note {
+    font-size: 11px;
+    color: #94A3B8;
+    text-align: center;
+    margin-top: 16px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>FILA 穿搭推荐系统架构图</h1>
+  <p>FastAPI + Elasticsearch + Milvus + 大模型 · AI 图文穿搭推荐服务</p>
+</div>
+
+<!-- ① 用户层 -->
+<div class="layer">
+  <div class="layer-header layer-header-blue">
+    <span class="icon">👥</span>
+    ① 用户层 · 前端与调用方
+    <span class="badge">5 类入口</span>
+  </div>
+  <div class="layer-body">
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">📱</span> 小程序调用方</div>
+      <div class="card-desc">导购小程序 / 微信小程序</div>
+      <span class="tag tag-orange">B2B 接口</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">💬</span> 穿搭调试台</div>
+      <div class="card-desc">对话推荐 / 意图展示 / SSE 日志</div>
+      <div class="card-code">web/</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">👗</span> 搭配预览</div>
+      <div class="card-desc">固定搭配列表 / 单套详情 / 商品详情</div>
+      <div class="card-code">outfits-viewer/</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🖼️</span> 图片 Debug</div>
+      <div class="card-desc">SKU/SPU 图片选型检查</div>
+      <div class="card-code">image-debug-viewer/</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🧪</span> 批量评测</div>
+      <div class="card-desc">全链路采样 + 人工打分</div>
+      <div class="card-code">eval/</div>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">▼</div>
+
+<!-- ② API 网关层 -->
+<div class="layer">
+  <div class="layer-header layer-header-green">
+    <span class="icon">🛡️</span>
+    ② API 接入层 · FastAPI 服务
+    <span class="badge">入口 / 鉴权 / 流式</span>
+  </div>
+  <div class="layer-body">
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🚪</span> 路由入口</div>
+      <div class="card-desc">/chat · /recommend/skus · /recommend/outfits · /v1/outfit/recommend</div>
+      <div class="card-code">backend/main.py</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🔑</span> 鉴权与限流</div>
+      <div class="card-desc">API Key 白名单 · app_id 绑定 · QPM/并发排队</div>
+      <div class="card-code">backend/auth.py</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">📡</span> SSE 流式输出</div>
+      <div class="card-desc">意图 → 锚点 → 召回进度 → 排序 → 结果</div>
+      <div class="card-code">StreamingResponse</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🪪</span> trace_id 追踪</div>
+      <div class="card-desc">每请求唯一追踪号 · 统一错误封装</div>
+      <div class="card-code">中间件 + 异常处理</div>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">▼</div>
+
+<!-- ③ 核心服务层 -->
+<div class="layer">
+  <div class="layer-header layer-header-purple">
+    <span class="icon">⚙️</span>
+    ③ 核心服务层 · 推荐引擎
+    <span class="badge">意图 → 召回 → 排序 → 理由</span>
+  </div>
+  <div class="layer-body">
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🧠</span> 意图解析</div>
+      <div class="card-desc">Trie 词典 + 图片理解 + LLM 融合 → 槽位</div>
+      <div class="card-code">backend/intent/</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🎯</span> 推荐编排</div>
+      <div class="card-desc">chat_stream 全链路编排 · 锚点确定</div>
+      <div class="card-code">services/recommend_service.py</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🔍</span> 多路召回</div>
+      <div class="card-desc">相似固定搭配 · Query2ES · 文本向量 · 互补模型</div>
+      <div class="card-code">services/outfit_recall.py</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">📊</span> 排序打分</div>
+      <div class="card-desc">粗排规则打分 → 精排可选 LLM 打分</div>
+      <div class="card-code">ranking/</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">💡</span> 推荐理由</div>
+      <div class="card-desc">搭配级 / 单品级话术生成</div>
+      <div class="card-code">llm_client.py + prompt/</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🧥</span> 虚拟试穿</div>
+      <div class="card-desc">模特图拼接 + 效果图生成</div>
+      <div class="card-code">services/tryon_service.py</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🃏</span> 卡片构建</div>
+      <div class="card-desc">搭配卡片字段组装</div>
+      <div class="card-code">services/card_builder.py</div>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">▼</div>
+
+<!-- ④ AI 模型层 -->
+<div class="layer">
+  <div class="layer-header layer-header-orange">
+    <span class="icon">🤖</span>
+    ④ AI 模型层 · 大模型与向量化
+    <span class="badge">6 类模型</span>
+  </div>
+  <div class="layer-body">
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">📝</span> qwen3.5-flash</div>
+      <div class="card-desc">意图解析 fallback · 推荐理由 · 排序打分</div>
+      <span class="tag tag-purple">文本生成</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">👁️</span> qwen3.6-27b</div>
+      <div class="card-desc">图片理解 · 看图生成推荐理由</div>
+      <span class="tag tag-purple">视觉理解</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🎨</span> fila-outfit-v6_1/v8sws</div>
+      <div class="card-desc">搭配美学评分 · 五维 CoT 评语</div>
+      <span class="tag tag-orange">美学评分</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🧥</span> vertex-tryon</div>
+      <div class="card-desc">虚拟试穿效果图生成</div>
+      <span class="tag tag-orange">图像生成</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🧬</span> doubao-embedding</div>
+      <div class="card-desc">图文向量化 · 1024 维</div>
+      <span class="tag tag-teal">向量化</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">👔</span> outfit-transformer</div>
+      <div class="card-desc">搭配兼容性打分 · 互补单品检索</div>
+      <span class="tag tag-teal">搭配模型</span>
+    </div>
+  </div>
+</div>
+
+<div class="layer-arrow">▼</div>
+
+<!-- ⑤ 数据层 -->
+<div class="layer">
+  <div class="layer-header layer-header-teal">
+    <span class="icon">🗄️</span>
+    ⑤ 数据层 · 存储与索引
+    <span class="badge">检索 / 向量 / 文件</span>
+  </div>
+  <div class="layer-body">
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🔎</span> Elasticsearch</div>
+      <div class="card-desc">fila-skus 单品 · fila-outfits 搭配 · reviews · requests</div>
+      <span class="tag tag-blue">属性/文本检索</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🧲</span> Milvus</div>
+      <div class="card-desc">图文向量 · 文本向量 · 互补向量 · 混合向量</div>
+      <span class="tag tag-purple">向量检索</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">📁</span> 本地文件</div>
+      <div class="card-desc">data/tables · data/processed · data/preview · data/logs</div>
+      <span class="tag tag-green">离线数据</span>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">🏭</span> Hive 数据源</div>
+      <div class="card-desc">商品主数据 · 图片 · 搭配表 · 素材表</div>
+      <span class="tag tag-green">日更 CSV</span>
+    </div>
+  </div>
+</div>
+
+<!-- 外部依赖 -->
+<div class="external">
+  <div class="external-title">🔌 外部依赖服务</div>
+  <div class="external-body">
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">☁️</span> LLM Gateway</div>
+      <div class="card-desc">OpenAI 兼容 · 私有部署大模型</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">☁️</span> 阿里云托管 Milvus</div>
+      <div class="card-desc">生产环境向量库</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">☁️</span> 内网 ES 集群</div>
+      <div class="card-desc">ES 7.9.3</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">☁️</span> 火山方舟 Embedding</div>
+      <div class="card-desc">doubao-embedding API</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">☁️</span> 私有 vLLM 美学模型</div>
+      <div class="card-desc">fila-outfit-v6_1 / v8sws</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon-bg">☁️</span> 虚拟试穿服务</div>
+      <div class="card-desc">vertex-tryon</div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部全流程链路 -->
+<div class="bottom-flow">
+  <div class="bottom-flow-title">📈 推荐全流程链路</div>
+  <div class="bottom-flow-steps">
+    <span class="flow-step flow-step-blue">① 用户输入 文字/图片</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-green">② FastAPI 接入 + 鉴权</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-purple">③ 意图解析</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-purple">④ 锚点确定</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-purple">⑤ 多路召回 (ES + Milvus + 搭配库)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-orange">⑥ 合并去重 + 排序打分</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-orange">⑦ 生成推荐理由 (LLM)</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-indigo">⑧ 可选虚拟试穿</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step flow-step-indigo">⑨ SSE 返回搭配卡片</span>
+  </div>
+</div>
+
+<!-- 图例 -->
+<div class="legend">
+  <span class="legend-item"><span class="legend-dot dot-blue"></span> 用户/前端</span>
+  <span class="legend-item"><span class="legend-dot dot-green"></span> API 接入</span>
+  <span class="legend-item"><span class="legend-dot dot-purple"></span> 核心服务</span>
+  <span class="legend-item"><span class="legend-dot dot-orange"></span> AI 模型</span>
+  <span class="legend-item"><span class="legend-dot dot-teal"></span> 数据存储</span>
+</div>
+
+<div class="note">
+  基于《技术架构文档》逆向生成 · FILA 穿搭推荐系统 · 2026-08<br>
+  核心链路：意图解析 → 锚点确定 → 多路召回 → 合并去重 → 排序打分 → 推荐理由 → 可选试穿 → SSE 返回
+</div>
+
+</body>
+</html>

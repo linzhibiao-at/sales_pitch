@@ -5,8 +5,6 @@
 
 from __future__ import annotations
 
-import base64
-import hashlib
 import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -17,157 +15,37 @@ logger = logging.getLogger(__name__)
 
 
 def now_iso() -> str:
-    """UTC + 本地时区 iso 字符串（与 jsonl_logger 口径一致）。"""
+    """UTC + 本地时区 iso 字符串。"""
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
 
 
-def build_input_block(
-    *,
-    input_sku_id: str = "",
-    image_url: Optional[str] = None,
-    image_base64: Optional[str] = None,
-    message: Optional[str] = None,
-    tryon: bool = False,
-    reason_style: Optional[str] = None,
-    outfit_id: Optional[str] = None,
-) -> dict[str, Any]:
-    """构造审计文档的 input 子结构；图片只存 url + 抓取字节 sha1。"""
-    image_sha1: Optional[str] = None
-    if image_base64:
-        try:
-            image_sha1 = hashlib.sha1(base64.b64decode(image_base64)).hexdigest()
-        except Exception:  # noqa: BLE001
-            image_sha1 = None
-    return {
-        "input_sku_id": input_sku_id or "",
-        "image_url": image_url or None,
-        "image_sha1": image_sha1,
-        "message": message or None,
-        "tryon": bool(tryon),
-        "reason_style": reason_style or None,
-        "outfit_id": outfit_id or None,
-    }
-
-
-def _slim_outfits(outfits: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for card in outfits or []:
-        items = []
-        for it in card.get("items") or []:
-            items.append({
-                "sku_id": it.get("sku_id"),
-                "role": it.get("role"),
-                "title": it.get("title"),
-                "spu_id": it.get("spu_id"),
-                "id_goods": it.get("id_goods"),
-            })
-        out.append({
-            "outfit_id": card.get("outfit_id"),
-            "outfit_rank": card.get("outfit_rank"),
-            "reason": card.get("reason"),
-            "items": items,
-        })
-    return out
-
-
-def build_recommend_doc(
-    *,
-    input_block: dict[str, Any],
-    captured: dict[str, Any],
-    meta: dict[str, Any],
-) -> dict[str, Any]:
-    """拼 recommend 审计文档。captured 为 chat_stream 采集的事件集合。"""
-    intent_ev = captured.get("intent") or {}
-    intent_block = None
-    if intent_ev:
-        intent_block = {
-            "intent": intent_ev.get("intent"),
-            "method": intent_ev.get("method"),
-            "confidence": intent_ev.get("confidence"),
-            "llm_fallback": intent_ev.get("llm_fallback"),
-            "image_override": intent_ev.get("image_override"),
-            "anchor_source": intent_ev.get("anchor_source"),
-            "image_role": intent_ev.get("image_role"),
-        }
-
-    recall_ev = captured.get("recall_done") or {}
-    anchor_skus = (captured.get("anchor_skus") or {}).get("skus") or []
-    anchor_sku_id = anchor_skus[0].get("sku_id") if anchor_skus else None
-    paths: dict[str, Any] = {}
-    for pe in captured.get("recall_progress") or []:
-        pname = pe.get("path")
-        if pname:
-            paths[pname] = {
-                "count": pe.get("count", 0),
-                "elapsed_ms": pe.get("elapsed_ms", 0),
-            }
-    recall_block = None
-    if recall_ev:
-        recall_block = {
-            "anchor_sku_id": anchor_sku_id,
-            "mode": recall_ev.get("mode"),
-            "recalled_sku_count": recall_ev.get("recalled_sku_count", 0),
-            "composed_outfit_count": recall_ev.get("composed_outfit_count", 0),
-            "before_dedupe": recall_ev.get("before_dedupe", 0),
-            "after_dedupe": recall_ev.get("after_dedupe", 0),
-            "paths": paths,
-            "roles": recall_ev.get("roles") or {},
-        }
-
-    ranking_ev = captured.get("ranking_reason_done") or {}
-    ranking_block = None
-    if ranking_ev:
-        ranking_block = {
-            "input_count": ranking_ev.get("input_count", 0),
-            "output_count": ranking_ev.get("output_count", 0),
-            "scoring_method": ranking_ev.get("scoring_method"),
-            "ranking_elapsed_ms": ranking_ev.get("ranking_elapsed_ms", 0),
-        }
-
-    return {
-        "trace_id": meta.get("trace_id"),
-        "session_id": meta.get("session_id"),
-        "app_id": meta.get("app_id"),
-        "caller": meta.get("caller"),
-        "request_kind": "recommend",
-        "ts": meta.get("ts"),
-        "elapsed_ms": meta.get("elapsed_ms"),
-        "status": meta.get("status", "ok"),
-        "error": meta.get("error"),
-        "input": input_block,
-        "intent": intent_block,
-        "recall": recall_block,
-        "ranking": ranking_block,
-        "result": {"outfits": _slim_outfits(captured.get("outfits") or [])},
-    }
-
-
-def build_regenerate_doc(
+def build_sales_pitch_doc(
     *,
     input_block: dict[str, Any],
     result: Optional[dict[str, Any]],
     meta: dict[str, Any],
 ) -> dict[str, Any]:
-    """拼 regenerate_reason 审计文档；intent/recall/ranking 不适用，置 None。"""
+    """拼 sales_pitch 审计文档；intent/recall/ranking 不适用，置 None。
+
+    result 为 ``{"pitch": str}`` 或 ``{"error": str}``；话术正文可能较长，
+    审计仅落前 600 字 + 长度，避免文档膨胀。
+    """
     res_block: Optional[dict[str, Any]] = None
     if isinstance(result, dict):
         if "error" in result:
-            res_block = {
-                "outfit_id": result.get("outfit_id"),
-                "reason": None,
-                "error": result.get("error"),
-            }
+            res_block = {"pitch": None, "pitch_len": 0, "error": result.get("error")}
         else:
+            pitch = str(result.get("pitch") or "")
             res_block = {
-                "outfit_id": result.get("outfit_id"),
-                "reason": result.get("reason"),
+                "pitch": pitch[:600],
+                "pitch_len": len(pitch),
             }
     return {
         "trace_id": meta.get("trace_id"),
         "session_id": meta.get("session_id"),
         "app_id": meta.get("app_id"),
         "caller": meta.get("caller"),
-        "request_kind": "regenerate_reason",
+        "request_kind": "sales_pitch",
         "ts": meta.get("ts"),
         "elapsed_ms": meta.get("elapsed_ms"),
         "status": meta.get("status", "ok"),
@@ -221,6 +99,7 @@ def build_audit_search_body(filters: dict[str, Any]) -> dict[str, Any]:
 def slim_audit_row(src: dict[str, Any]) -> dict[str, Any]:
     """审计列表精简行（详情另调 /api/audit/requests/{trace_id}）。"""
     result = src.get("result") or {}
+    input_block = src.get("input") or {}
     return {
         "trace_id": src.get("trace_id"),
         "session_id": src.get("session_id"),
@@ -229,9 +108,9 @@ def slim_audit_row(src: dict[str, Any]) -> dict[str, Any]:
         "ts": src.get("ts"),
         "elapsed_ms": src.get("elapsed_ms"),
         "status": src.get("status"),
-        "input_sku_id": (src.get("input") or {}).get("input_sku_id"),
-        "outfit_id": (src.get("input") or {}).get("outfit_id"),
-        "outfit_count": len(result.get("outfits") or []),
+        "product_count": len(input_block.get("products") or []),
+        "has_customer": bool(input_block.get("customer")),
+        "pitch_len": result.get("pitch_len") or 0,
     }
 
 
@@ -246,7 +125,7 @@ class RequestAuditLogger:
         if es is not None:
             self._es = es
         else:
-            from backend.retrieval.es_client import EsClient
+            from backend.es_client import EsClient
             self._es = EsClient()
         self._enabled = (
             get_request_audit_enabled() if enabled is None else bool(enabled)

@@ -4,7 +4,7 @@ keys:
   - api_key: "ak_a1b2c3d4e5f6789012345678abcdef01"
     app_id: "micro_guide"
     name: "导购小程序"
-    allowed_apis: ["recommend", "regenerate-reason", "get_outfits", "get_sku"]
+    allowed_apis: ["recommend", "regenerate-reason", "sales_pitch", "get_outfits", "get_sku"]
     rate_limit:
       qpm: 200
       daily: 50000

@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FILA AI 导购系统架构图</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #F8FAFC;
+    color: #1E293B;
+    padding: 32px 24px;
+  }
+
+  /* ===== 顶部标题 ===== */
+  .page-title { text-align: center; margin-bottom: 8px; }
+  .page-title h1 {
+    font-size: 34px;
+    font-weight: 800;
+    color: #111827;
+    letter-spacing: 1px;
+  }
+  .page-title p {
+    font-size: 14px;
+    color: #6B7280;
+    margin-top: 6px;
+  }
+
+  /* ===== 状态图例 ===== */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin: 14px 0 26px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #374151;
+  }
+  .status-dot { width: 11px; height: 11px; border-radius: 4px; display: inline-block; }
+  .st-done   { background: #10B981; }
+  .st-doing  { background: #F59E0B; }
+  .st-plan   { background: #9CA3AF; }
+
+  /* ===== 每层三栏容器（主题色边框 + 浅色底） ===== */
+  .layer {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+    margin-bottom: 14px;
+    border-radius: 16px;
+    border: 2px solid;
+    padding: 14px;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  /* 各层主题色边框与浅色底（层次清晰） */
+  .layer-blue   { border-color: #60A5FA; background: #EFF6FF; }
+  .layer-green  { border-color: #34D399; background: #F0FDF4; }
+  .layer-orange { border-color: #FB923C; background: #FFFBEB; }
+  .layer-indigo { border-color: #818CF8; background: #EEF2FF; }
+  .layer-purple { border-color: #A78BFA; background: #F5F3FF; }
+  .layer-fuchsia{ border-color: #E879F9; background: #FDF4FF; }
+
+  /* 层间箭头（自上而下） */
+  .layer-arrow {
+    text-align: center;
+    font-size: 22px;
+    color: #374151;
+    font-weight: 700;
+    line-height: 1;
+    padding: 6px 0 10px;
+  }
+
+  /* ===== 左侧锚点 ===== */
+  .anchor {
+    width: 150px;
+    min-height: 96px;
+    border-radius: 16px;
+    color: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 10px;
+    border: 2px solid rgba(255,255,255,0.7);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .anchor .anchor-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.22);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+  .anchor .anchor-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .anchor .anchor-sub { font-size: 10px; opacity: 0.85; margin-top: 2px; }
+
+  /* 各层锚点渐变色 */
+  .a-blue   { background: linear-gradient(135deg, #2563EB, #60A5FA); }
+  .a-green  { background: linear-gradient(135deg, #10B981, #34D399); }
+  .a-orange { background: linear-gradient(135deg, #EA580C, #FDBA74); }
+  .a-indigo { background: linear-gradient(135deg, #4F46E5, #818CF8); }
+  .a-purple { background: linear-gradient(135deg, #7C3AED, #A78BFA); }
+  .a-fuchsia{ background: linear-gradient(135deg, #9333EA, #C084FC); }
+
+  /* ===== 中间核心区 ===== */
+  .core {
+    flex: 1;
+    border-radius: 12px;
+    border: 2px solid #CBD5E1;
+    background: #FFFFFF;
+    padding: 14px 16px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .core-title {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid #E5E7EB;
+    letter-spacing: 0.5px;
+  }
+  .ct-blue   { color: #2563EB; }
+  .ct-green  { color: #10B981; }
+  .ct-orange { color: #EA580C; }
+  .ct-indigo { color: #4F46E5; }
+  .ct-purple { color: #7C3AED; }
+  .ct-fuchsia{ color: #9333EA; }
+
+  .core-body { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; }
+
+  /* 中间模块卡片 */
+  .module {
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: #F9FAFB;
+    text-align: center;
+    flex: 1;
+    min-width: 90px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .module .m-icon {
+    font-size: 16px;
+    margin-bottom: 3px;
+  }
+  .module .m-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    line-height: 1.3;
+  }
+  .module .m-desc {
+    font-size: 10px;
+    color: #9CA3AF;
+    margin-top: 2px;
+  }
+
+  /* 能力域模块（中台内，带状态） */
+  .cap-module {
+    border-radius: 8px;
+    padding: 8px 10px;
+    flex: 1;
+    min-width: 130px;
+    border: 1.5px solid #CBD5E1;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .cap-module .cm-head {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .cap-module .cm-head .cm-icon { font-size: 14px; }
+  .cap-module .cm-head .cm-st {
+    font-size: 9px; font-weight: 500;
+    padding: 1px 6px; border-radius: 6px;
+    margin-left: auto;
+  }
+  .cm-done   { color: #065F46; }
+  .cm-done .cm-st   { background: #D1FAE5; color: #065F46; }
+  .cm-doing  { color: #92400E; }
+  .cm-doing .cm-st  { background: #FEF3C7; color: #92400E; }
+  .cm-plan   { color: #475569; }
+  .cm-plan .cm-st   { background: #F1F5F9; color: #475569; }
+  .cap-module .cm-items { display: flex; flex-wrap: wrap; gap: 4px; }
+  .cm-item {
+    font-size: 10px;
+    color: #475569;
+    background: #F9FAFB;
+    border: 1px solid #D1D5DB;
+    border-radius: 6px;
+    padding: 2px 6px;
+  }
+
+  /* 中台内两列布局 */
+  .cap-cols { display: flex; gap: 10px; flex-wrap: wrap; width: 100%; }
+  .cap-col { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* ===== 右侧信息区 ===== */
+  .info {
+    width: 210px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .info-card {
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .info-card .ic-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 5px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .info-card .ic-title .ic-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block;
+  }
+  .info-card .ic-body {
+    font-size: 11px;
+    color: #374151;
+    line-height: 1.5;
+  }
+  .info-card .ic-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .ic-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    font-weight: 500;
+  }
+  .layer-blue   .ic-tag { background: #DBEAFE; color: #1D4ED8; }
+  .layer-green  .ic-tag { background: #D1FAE5; color: #047857; }
+  .layer-orange .ic-tag { background: #FFEDD5; color: #C2410C; }
+  .layer-indigo .ic-tag { background: #E0E7FF; color: #4338CA; }
+  .layer-purple .ic-tag { background: #EDE9FE; color: #6D28D9; }
+  .layer-fuchsia .ic-tag { background: #FAE8FF; color: #A21CAF; }
+
+  /* ===== 安全边界 ===== */
+  .boundary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .boundary-line { flex: 1; border-top: 2.5px dashed #EF4444; }
+  .boundary-label {
+    font-size: 10px;
+    color: #EF4444;
+    font-weight: 600;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 6px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+
+  /* ===== 底部线型图例 ===== */
+  .line-legend {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: #374151;
+  }
+  .line-item { display: inline-flex; align-items: center; gap: 6px; }
+  .line-sample { font-size: 14px; font-weight: 600; color: #111827; }
+
+  .note {
+    font-size: 11px;
+    color: #9CA3AF;
+    text-align: center;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 1100px) {
+    .layer { flex-wrap: wrap; }
+    .anchor { width: 100%; min-height: auto; flex-direction: row; gap: 10px; }
+    .info { width: 100%; flex-direction: row; }
+    .info-card { flex: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>FILA AI 能力架构图</h1>
+  <p>从数据支撑到业务场景 · 六层 AI 导购能力全景</p>
+</div>
+
+<!-- 状态图例 -->
+<div class="legend">
+  <span class="legend-item"><span class="status-dot st-done"></span> 已实现</span>
+  <span class="legend-item"><span class="status-dot st-doing"></span> 进行中</span>
+  <span class="legend-item"><span class="status-dot st-plan"></span> 规划中</span>
+</div>
+
+<!-- ============ 第 1 层：场景域（最顶层） ============ -->
+<div class="layer layer-fuchsia">
+  <div class="anchor a-fuchsia">
+    <div class="anchor-icon">🏢</div>
+    <div class="anchor-title">场景域</div>
+    <div class="anchor-sub">Scenario Domain</div>
+  </div>
+  <div class="core">
+    <div class="core-title ct-fuchsia">业务落地场景</div>
+    <div class="core-body">
+      <div class="module"><div class="m-icon">👗</div><div class="m-name">搭配推荐</div><div class="m-desc">个性化推荐</div></div>
+      <div class="module"><div class="m-icon">💬</div><div class="m-name">导购与销售沟通</div><div class="m-desc">销售辅助</div></div>
+      <div class="module"><div class="m-icon">🏬</div><div class="m-name">门店 AI 虚拟试衣</div><div class="m-desc">线下体验</div></div>
+      <div class="module"><div class="m-icon">🖥️</div><div class="m-name">官网虚拟试衣</div><div class="m-desc">线上体验</div></div>
+      <div class="module"><div class="m-icon">📞</div><div class="m-name">400 客服话术</div><div class="m-desc">热线话术</div></div>
+      <div class="module"><div class="m-icon">🤖</div><div class="m-name">Air 小安智能问答</div><div class="m-desc">内部问答</div></div>
+    </div>
+  </div>
+  <div class="info">
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#9333EA"></span>核心作用</div>
+      <div class="ic-body">AI 能力最终落地的业务场景</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#10B981"></span>关键能力</div>
+      <div class="ic-tags">
+        <span class="ic-tag">推荐</span><span class="ic-tag">沟通</span><span class="ic-tag">试衣</span><span class="ic-tag">客服</span><span class="ic-tag">问答</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="layer-arrow">▲</div>
+
+<!-- ============ 第 2 层：应用群 ============ -->
+<div class="layer layer-purple">
+  <div class="anchor a-purple">
+    <div class="anchor-icon">📱</div>
+    <div class="anchor-title">应用群</div>
+    <div class="anchor-sub">Application Group</div>
+  </div>
+  <div class="core">
+    <div class="core-title ct-purple">多渠道触达</div>
+    <div class="core-body">
+      <div class="module"><div class="m-icon">🛍️</div><div class="m-name">微导购</div><div class="m-desc">导购工作台</div></div>
+      <div class="module"><div class="m-icon">🌐</div><div class="m-name">fila+ 官网</div><div class="m-desc">官方商城</div></div>
+      <div class="module"><div class="m-icon">👥</div><div class="m-name">fila+ 社群</div><div class="m-desc">社群运营</div></div>
+      <div class="module"><div class="m-icon">🎧</div><div class="m-name">fila+ 客服系统</div><div class="m-desc">客服服务</div></div>
+      <div class="module"><div class="m-icon">🔌</div><div class="m-name">Air 小安 MCP</div><div class="m-desc">智能体接入</div></div>
+    </div>
+  </div>
+  <div class="info">
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#7C3AED"></span>核心作用</div>
+      <div class="ic-body">面向不同渠道的应用产品</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#10B981"></span>关键能力</div>
+      <div class="ic-tags">
+        <span class="ic-tag">移动</span><span class="ic-tag">官网</span><span class="ic-tag">社群</span><span class="ic-tag">客服</span><span class="ic-tag">智能体</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="layer-arrow">▲</div>
+
+<!-- ============ 第 3 层：BFF 网关 ============ -->
+<div class="layer layer-indigo">
+  <div class="anchor a-indigo">
+    <div class="anchor-icon">🛡️</div>
+    <div class="anchor-title">AI 能力 BFF 网关</div>
+    <div class="anchor-sub">BFF Gateway</div>
+  </div>
+  <div class="core">
+    <div class="core-title ct-indigo">统一接入与治理</div>
+    <div class="core-body">
+      <div class="module"><div class="m-icon">🌍</div><div class="m-name">HTTP 接口</div><div class="m-desc">REST API</div></div>
+      <div class="module"><div class="m-icon">🔗</div><div class="m-name">MCP 接口</div><div class="m-desc">模型协议</div></div>
+      <div class="module"><div class="m-icon">🧩</div><div class="m-name">业务编排</div><div class="m-desc">能力组合</div></div>
+      <div class="module"><div class="m-icon">✂️</div><div class="m-name">数据剪裁</div><div class="m-desc">响应裁剪</div></div>
+      <div class="module"><div class="m-icon">🔐</div><div class="m-name">权限校验</div><div class="m-desc">访问鉴权</div></div>
+      <div class="module"><div class="m-icon">⏱️</div><div class="m-name">限流拦截</div><div class="m-desc">流量保护</div></div>
+      <div class="module"><div class="m-icon">🧭</div><div class="m-name">路由</div><div class="m-desc">请求分发</div></div>
+    </div>
+    <div class="boundary">
+      <div class="boundary-line"></div>
+      <span class="boundary-label">⚠️ 安全边界 · 内外网隔离</span>
+      <div class="boundary-line"></div>
+    </div>
+  </div>
+  <div class="info">
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#4F46E5"></span>核心作用</div>
+      <div class="ic-body">应用统一接入 AI 能力的网关</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#10B981"></span>关键能力</div>
+      <div class="ic-tags">
+        <span class="ic-tag">鉴权</span><span class="ic-tag">限流</span><span class="ic-tag">路由</span><span class="ic-tag">编排</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="layer-arrow">▲</div>
+
+<!-- ============ 第 4 层：AI 能力中台（核心） ============ -->
+<div class="layer layer-orange">
+  <div class="anchor a-orange">
+    <div class="anchor-icon">⚙️</div>
+    <div class="anchor-title">AI 能力中台</div>
+    <div class="anchor-sub">Core AI Platform</div>
+  </div>
+  <div class="core">
+    <div class="core-title ct-orange">业务能力中枢 · 五大能力域</div>
+    <div class="core-body">
+      <div class="cap-cols">
+        <div class="cap-col">
+          <!-- AI 搭配推荐 - 已实现 -->
+          <div class="cap-module cm-done">
+            <div class="cm-head"><span class="cm-icon">👗</span>AI 搭配推荐<span class="cm-st">已实现</span></div>
+            <div class="cm-items">
+              <span class="cm-item">商品组合</span><span class="cm-item">推荐议案</span><span class="cm-item">组合排序</span>
+              <span class="cm-item">美学打分</span><span class="cm-item">重图识别</span><span class="cm-item">向量匹配</span>
+            </div>
+          </div>
+          <!-- AI 虚拟试衣 - 进行中 -->
+          <div class="cap-module cm-doing">
+            <div class="cm-head"><span class="cm-icon">🧥</span>AI 虚拟试衣<span class="cm-st">进行中</span></div>
+            <div class="cm-items">
+              <span class="cm-item">照片矫正</span><span class="cm-item">照片安全校验</span><span class="cm-item">生成试穿图</span>
+            </div>
+          </div>
+        </div>
+        <div class="cap-col">
+          <!-- 导购话术 - 规划中 -->
+          <div class="cap-module cm-plan">
+            <div class="cm-head"><span class="cm-icon">💬</span>导购话术<span class="cm-st">规划中</span></div>
+            <div class="cm-items">
+              <span class="cm-item">生成话术</span><span class="cm-item">话术打分</span><span class="cm-item">沟通记忆</span>
+              <span class="cm-item">记忆摘要</span><span class="cm-item">话术风格</span><span class="cm-item">个性话术</span>
+            </div>
+          </div>
+          <!-- AI 商品库 - 规划中 -->
+          <div class="cap-module cm-plan">
+            <div class="cm-head"><span class="cm-icon">🏷️</span>AI 商品库<span class="cm-st">规划中</span></div>
+            <div class="cm-items">
+              <span class="cm-item">商品卖点</span><span class="cm-item">商品知识库</span>
+            </div>
+          </div>
+          <!-- 用户画像 - 规划中 -->
+          <div class="cap-module cm-plan">
+            <div class="cm-head"><span class="cm-icon">👤</span>用户画像<span class="cm-st">规划中</span></div>
+            <div class="cm-items">
+              <span class="cm-item">标签体系</span><span class="cm-item">商品知识理解</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="info">
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#EA580C"></span>核心作用</div>
+      <div class="ic-body">AI 能力中枢，沉淀可复用业务能力</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#10B981"></span>关键能力</div>
+      <div class="ic-tags">
+        <span class="ic-tag">搭配</span><span class="ic-tag">试衣</span><span class="ic-tag">话术</span><span class="ic-tag">商品库</span><span class="ic-tag">画像</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="layer-arrow">▲</div>
+
+<!-- ============ 第 5 层：LLM 模型层 ============ -->
+<div class="layer layer-green">
+  <div class="anchor a-green">
+    <div class="anchor-icon">🤖</div>
+    <div class="anchor-title">LLM 模型层</div>
+    <div class="anchor-sub">Model Layer</div>
+  </div>
+  <div class="core">
+    <div class="core-title ct-green">算法能力供给</div>
+    <div class="core-body">
+      <div class="module"><div class="m-icon">🖼️</div><div class="m-name">重图识别模型</div><div class="m-desc">商品图片识别</div></div>
+      <div class="module"><div class="m-icon">🧬</div><div class="m-name">向量模型</div><div class="m-desc">图文向量化</div></div>
+      <div class="module"><div class="m-icon">👁️</div><div class="m-name">视觉模型</div><div class="m-desc">图像理解</div></div>
+      <div class="module"><div class="m-icon">🧥</div><div class="m-name">试穿模型</div><div class="m-desc">虚拟试穿</div></div>
+      <div class="module"><div class="m-icon">📊</div><div class="m-name">排序评分模型</div><div class="m-desc">推荐排序</div></div>
+    </div>
+  </div>
+  <div class="info">
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#10B981"></span>核心作用</div>
+      <div class="ic-body">为 AI 能力中台提供算法模型支撑</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#2563EB"></span>关键能力</div>
+      <div class="ic-tags">
+        <span class="ic-tag">识别</span><span class="ic-tag">向量化</span><span class="ic-tag">视觉</span><span class="ic-tag">试穿</span><span class="ic-tag">排序</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="layer-arrow">▲</div>
+
+<!-- ============ 第 6 层：数据支撑层（最底层） ============ -->
+<div class="layer layer-blue">
+  <div class="anchor a-blue">
+    <div class="anchor-icon">🗄️</div>
+    <div class="anchor-title">数据支撑</div>
+    <div class="anchor-sub">Data Support</div>
+  </div>
+  <div class="core">
+    <div class="core-title ct-blue">存储与检索底座</div>
+    <div class="core-body">
+      <div class="module"><div class="m-icon">🧲</div><div class="m-name">Milvus</div><div class="m-desc">向量数据库</div></div>
+      <div class="module"><div class="m-icon">🔎</div><div class="m-name">Elasticsearch</div><div class="m-desc">全文检索</div></div>
+      <div class="module"><div class="m-icon">⚡</div><div class="m-name">Redis</div><div class="m-desc">缓存加速</div></div>
+      <div class="module"><div class="m-icon">🗃️</div><div class="m-name">MySQL</div><div class="m-desc">业务数据</div></div>
+    </div>
+  </div>
+  <div class="info">
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#2563EB"></span>核心作用</div>
+      <div class="ic-body">为上层模型与能力提供数据底座</div>
+    </div>
+    <div class="info-card">
+      <div class="ic-title"><span class="ic-dot" style="background:#10B981"></span>关键能力</div>
+      <div class="ic-tags">
+        <span class="ic-tag">向量检索</span><span class="ic-tag">全文检索</span><span class="ic-tag">缓存</span><span class="ic-tag">业务存储</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部线型图例 -->
+<div class="line-legend">
+  <span class="line-item"><span class="line-sample">▲</span> 自下而上支撑</span>
+  <span class="line-item"><span class="line-sample">—→</span> 数据流</span>
+  <span class="line-item"><span class="line-sample">---→</span> 调用 / 连接</span>
+  <span class="line-item"><span class="line-sample">↔</span> 信息流 / 反馈</span>
+</div>
+
+<div class="note">
+  FILA AI 导购系统架构图 · 六层架构：场景域 → 应用群 → BFF 网关 → AI 能力中台 → LLM 模型层 → 数据支撑<br>
+  状态标记：🟢 已实现 · 🟠 进行中 · ⚪ 规划中 · 参考「技术架构图 UI」三栏式布局风格
+</div>
+</body>
+</html>

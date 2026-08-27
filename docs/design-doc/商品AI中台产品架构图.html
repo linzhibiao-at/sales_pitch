@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商品 AI 中台能力架构图</title>
+<style>
+  :root {
+    --blue: #2F80ED;  --blue-bg: #EFF6FF;  --blue-border: #BFDBFE;  --blue-deep: #1E3A5F;
+    --teal: #2D9CDB;  --teal-bg: #EEF2FF;  --teal-border: #C7D2FE;  --teal-deep: #1E3A5F;
+    --orange: #F2994A; --orange-bg: #FFFBEB; --orange-border: #FDE68A; --orange-deep: #D35400;
+    --green: #27AE60; --green-bg: #F0FDF4; --green-border: #A7F3D0; --green-deep: #065F46;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #F5F7FA;
+    color: #1E293B;
+    padding: 28px 20px;
+  }
+
+  /* ===== 顶部 Header ===== */
+  .header {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    padding: 20px 28px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-logo {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: linear-gradient(135deg, #2563EB, #7B61FF);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #FFFFFF; flex-shrink: 0;
+  }
+  .header-title h1 {
+    font-size: 26px; font-weight: 700; color: #1E293B;
+  }
+  .header-title p {
+    font-size: 13px; color: #64748B; margin-top: 3px;
+  }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; }
+  .legend-item {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: #475569;
+    background: #F8FAFC; border: 1px solid #E2E8F0;
+    border-radius: 999px; padding: 4px 10px;
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .dot-blue   { background: #2F80ED; }
+  .dot-teal   { background: #2D9CDB; }
+  .dot-orange { background: #F2994A; }
+  .dot-green  { background: #27AE60; }
+
+  /* ===== 主体 4 列 ===== */
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .col {
+    border-radius: 16px;
+    border: 1px solid;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .col-blue   { background: var(--blue-bg);   border-color: var(--blue-border); }
+  .col-teal   { background: var(--teal-bg);   border-color: var(--teal-border); }
+  .col-orange { background: var(--orange-bg); border-color: var(--orange-border); }
+  .col-green  { background: var(--green-bg);  border-color: var(--green-border); }
+
+  .col-header {
+    padding: 14px 14px 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .col-header .step-badge {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #FFFFFF; flex-shrink: 0;
+  }
+  .col-blue   .step-badge { background: var(--blue); }
+  .col-teal   .step-badge { background: var(--teal); }
+  .col-orange .step-badge { background: var(--orange); }
+  .col-green  .step-badge { background: var(--green); }
+  .col-header .col-name { font-size: 15px; font-weight: 700; line-height: 1.2; }
+  .col-blue   .col-name { color: var(--blue-deep); }
+  .col-teal   .col-name { color: var(--teal-deep); }
+  .col-orange .col-name { color: var(--orange-deep); }
+  .col-green  .col-name { color: var(--green-deep); }
+  .col-header .col-en { font-size: 10px; font-weight: 500; color: #94A3B8; display: block; margin-top: 1px; }
+
+  .col-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+
+  /* 模块定位说明 */
+  .col-desc {
+    font-size: 11px; color: #64748B; line-height: 1.5;
+    background: #FFFFFF; border: 1px solid #E2E8F0;
+    border-radius: 8px; padding: 8px 10px;
+  }
+
+  /* 能力卡片 - 并列展示（无箭头） */
+  .ability-grid { display: flex; flex-direction: column; gap: 8px; }
+  .ability {
+    border-radius: 8px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    padding: 9px 10px;
+  }
+  .ability .ab-title {
+    font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ability .ab-title .icon-bg {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 5px; font-size: 10px; flex-shrink: 0;
+  }
+  .ability .ab-desc { font-size: 10px; color: #64748B; margin-top: 2px; line-height: 1.4; }
+  .col-blue   .ability .ab-title { color: var(--blue-deep); }
+  .col-blue   .ability .ab-title .icon-bg { background: rgba(47,128,237,0.12); }
+  .col-teal   .ability .ab-title { color: var(--teal-deep); }
+  .col-teal   .ability .ab-title .icon-bg { background: rgba(45,156,219,0.12); }
+  .col-orange .ability .ab-title { color: var(--orange-deep); }
+  .col-orange .ability .ab-title .icon-bg { background: rgba(242,153,74,0.14); }
+  .col-green  .ability .ab-title { color: var(--green-deep); }
+  .col-green  .ability .ab-title .icon-bg { background: rgba(39,174,96,0.12); }
+
+  /* 能力标签 */
+  .ability-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .ab-tag {
+    font-size: 10px; padding: 1px 6px; border-radius: 5px; font-weight: 500;
+  }
+  .col-blue   .ab-tag { background: rgba(47,128,237,0.10); color: #2F80ED; }
+  .col-teal   .ab-tag { background: rgba(45,156,219,0.10); color: #2D9CDB; }
+  .col-orange .ab-tag { background: rgba(242,153,74,0.12); color: #D35400; }
+  .col-green  .ab-tag { background: rgba(39,174,96,0.10);  color: #27AE60; }
+
+  /* ===== 能力增强层 ===== */
+  .enhance {
+    border-radius: 16px;
+    border: 1.5px dashed #CBD5E1;
+    background: #F8FAFC;
+    padding: 14px 20px;
+    margin-bottom: 18px;
+  }
+  .enhance-title {
+    font-size: 12px; font-weight: 600; color: #64748B; margin-bottom: 10px;
+  }
+  .enhance-body { display: flex; gap: 10px; flex-wrap: wrap; }
+  .enhance-card {
+    border-radius: 10px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    padding: 10px 14px;
+    flex: 1; min-width: 150px;
+  }
+  .enhance-card .ec-title {
+    font-size: 12px; font-weight: 600; color: #334155;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .enhance-card .ec-title .icon-bg {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 6px; font-size: 11px; flex-shrink: 0;
+    background: rgba(100,116,139,0.10);
+  }
+  .enhance-card .ec-desc { font-size: 10px; color: #94A3B8; margin-top: 3px; line-height: 1.4; }
+
+  /* ===== 价值层 ===== */
+  .value {
+    border-radius: 16px;
+    background: linear-gradient(135deg, #1E293B, #334155);
+    color: #FFFFFF;
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+  }
+  .value-title { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .value-items { display: flex; gap: 10px; flex-wrap: wrap; }
+  .value-item {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #E2E8F0;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 999px; padding: 5px 12px;
+  }
+
+  .note {
+    font-size: 11px; color: #94A3B8; text-align: center; margin-top: 14px; line-height: 1.6;
+  }
+
+  @media (max-width: 1200px) {
+    .columns { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .columns { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶部 Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🤖</div>
+    <div class="header-title">
+      <h1>商品 AI 中台能力架构图</h1>
+      <p>AI 驱动的商品智能化中台 · 四大核心能力 · 一次建设、多端复用</p>
+    </div>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot dot-blue"></span> 推荐搭配</span>
+    <span class="legend-item"><span class="legend-dot dot-teal"></span> 导购聊天话术</span>
+    <span class="legend-item"><span class="legend-dot dot-orange"></span> 虚拟试衣</span>
+    <span class="legend-item"><span class="legend-dot dot-green"></span> 用户画像分析</span>
+  </div>
+</div>
+
+<!-- 主体 4 列核心能力模块 -->
+<div class="columns">
+
+  <!-- ① 推荐搭配（商品推荐 + 搭配生成 合并） -->
+  <div class="col col-blue">
+    <div class="col-header">
+      <span class="step-badge">1</span>
+      <span class="col-name">推荐搭配<span class="col-en">Recommend &amp; Outfit</span></span>
+    </div>
+    <div class="col-body">
+      <div class="col-desc">基于用户意图与商品特征，完成个性化商品推荐与成套搭配生成</div>
+      <div class="ability-grid">
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🔍</span>多路召回</div>
+          <div class="ab-desc">属性检索 + 向量检索 + 关联规则</div>
+          <div class="ability-tags"><span class="ab-tag">实时召回</span><span class="ab-tag">混合检索</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">📊</span>排序打分</div>
+          <div class="ab-desc">规则粗排 + 模型精排</div>
+          <div class="ability-tags"><span class="ab-tag">可解释排序</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🧩</span>搭配生成</div>
+          <div class="ab-desc">品类互补 + 色彩系列匹配 + 美学评分</div>
+          <div class="ability-tags"><span class="ab-tag">搭配规则引擎</span><span class="ab-tag">美学模型</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">💡</span>推荐理由</div>
+          <div class="ab-desc">推荐理由 / 卖点话术生成</div>
+          <div class="ability-tags"><span class="ab-tag">可解释</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 导购聊天话术 -->
+  <div class="col col-teal">
+    <div class="col-header">
+      <span class="step-badge">2</span>
+      <span class="col-name">导购聊天话术<span class="col-en">Guide Chat Copy</span></span>
+    </div>
+    <div class="col-body">
+      <div class="col-desc">导购结合会员信息与商品信息，生成个性化话术，提升转化率</div>
+      <div class="ability-grid">
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">👤</span>会员信息识别</div>
+          <div class="ab-desc">会员等级 / 偏好 / 历史行为接入</div>
+          <div class="ability-tags"><span class="ab-tag">画像联动</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🏷️</span>商品信息理解</div>
+          <div class="ab-desc">商品卖点 / 属性 / 场景提炼</div>
+          <div class="ability-tags"><span class="ab-tag">卖点抽取</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🧠</span>意图理解</div>
+          <div class="ab-desc">意图识别 + 槽位抽取</div>
+          <div class="ability-tags"><span class="ab-tag">多轮对话</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">✍️</span>个性化话术生成</div>
+          <div class="ab-desc">风格化话术 + 场景模板 + LLM 生成</div>
+          <div class="ability-tags"><span class="ab-tag">风格化</span><span class="ab-tag">转化率优化</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 虚拟试衣 -->
+  <div class="col col-orange">
+    <div class="col-header">
+      <span class="step-badge">3</span>
+      <span class="col-name">虚拟试衣<span class="col-en">Virtual Try-on</span></span>
+    </div>
+    <div class="col-body">
+      <div class="col-desc">基于用户照片与商品图，生成逼真试穿效果，降低决策成本</div>
+      <div class="ability-grid">
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🖼️</span>人像处理</div>
+          <div class="ab-desc">人像分割 + 姿态估计</div>
+          <div class="ability-tags"><span class="ab-tag">图像分割</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🧥</span>试穿生成</div>
+          <div class="ab-desc">服装贴合 + 效果图生成</div>
+          <div class="ability-tags"><span class="ab-tag">图像生成</span><span class="ab-tag">版型适配</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">✅</span>效果校验</div>
+          <div class="ab-desc">图像质量 + 合规审核</div>
+          <div class="ability-tags"><span class="ab-tag">质量审核</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ 用户画像分析 -->
+  <div class="col col-green">
+    <div class="col-header">
+      <span class="step-badge">4</span>
+      <span class="col-name">用户画像分析<span class="col-en">User Profiling</span></span>
+    </div>
+    <div class="col-body">
+      <div class="col-desc">沉淀用户标签与偏好，为推荐、话术、试衣提供个性化依据</div>
+      <div class="ability-grid">
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🏷️</span>标签体系</div>
+          <div class="ab-desc">基础 / 行为 / 偏好标签</div>
+          <div class="ability-tags"><span class="ab-tag">标签管理</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🧮</span>画像计算</div>
+          <div class="ab-desc">实时 + 离线特征计算</div>
+          <div class="ability-tags"><span class="ab-tag">实时+离线</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🔬</span>圈层洞察</div>
+          <div class="ab-desc">人群聚类 + 偏好洞察</div>
+          <div class="ability-tags"><span class="ab-tag">人群分析</span></div>
+        </div>
+        <div class="ability">
+          <div class="ab-title"><span class="icon-bg">🎭</span>情绪识别</div>
+          <div class="ab-desc">对话情绪 / 满意度理解</div>
+          <div class="ability-tags"><span class="ab-tag">情感分析</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 能力增强层 -->
+<div class="enhance">
+  <div class="enhance-title">🛠️ 中台横向增强能力（贯穿所有核心模块）</div>
+  <div class="enhance-body">
+    <div class="enhance-card">
+      <div class="ec-title"><span class="icon-bg">🔐</span>权限与租户隔离</div>
+      <div class="ec-desc">多品牌 / 多租户数据隔离</div>
+    </div>
+    <div class="enhance-card">
+      <div class="ec-title"><span class="icon-bg">⚡</span>缓存加速</div>
+      <div class="ec-desc">热点结果缓存 · 降低延迟</div>
+    </div>
+    <div class="enhance-card">
+      <div class="ec-title"><span class="icon-bg">📡</span>可观测性</div>
+      <div class="ec-desc">Trace / 耗时 / Token 消耗</div>
+    </div>
+    <div class="enhance-card">
+      <div class="ec-title"><span class="icon-bg">🔄</span>反馈学习</div>
+      <div class="ec-desc">Badcase 回流 · 持续迭代</div>
+    </div>
+    <div class="enhance-card">
+      <div class="ec-title"><span class="icon-bg">🛡️</span>安全合规</div>
+      <div class="ec-desc">内容审核 · 隐私保护</div>
+    </div>
+    <div class="enhance-card">
+      <div class="ec-title"><span class="icon-bg">🧬</span>多模态支持</div>
+      <div class="ec-desc">文本 / 图像 / 视频统一理解</div>
+    </div>
+  </div>
+</div>
+
+<!-- 价值层 -->
+<div class="value">
+  <span class="value-title">🎯 中台价值</span>
+  <div class="value-items">
+    <span class="value-item">🔁 能力复用 · 一次建设多处调用</span>
+    <span class="value-item">📈 降本增效 · 提升转化与体验</span>
+    <span class="value-item">🧭 数据驱动 · 持续迭代优化</span>
+  </div>
+</div>
+
+<div class="note">
+  商品 AI 中台能力架构图 · 覆盖推荐搭配 / 导购聊天话术 / 虚拟试衣 / 用户画像分析 四大核心能力<br>
+  参考「主流架构图 UI 模板」风格绘制 · 现代科技扁平风 · 体现产品能力而非业务流程
+</div>
+
+</body>
+</html>

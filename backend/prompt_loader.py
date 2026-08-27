@@ -64,10 +64,6 @@ def validate_prompt_paths() -> list[str]:
     pf = cfg.get("prompt_files") or {}
     if isinstance(pf, dict):
         roots.extend(str(v) for v in pf.values() if v)
-    rec = cfg.get("recommend") or {}
-    rp = rec.get("reason_prompts") or {}
-    if isinstance(rp, dict):
-        roots.extend(str(v) for v in rp.values() if v)
     for rel in sorted(set(roots)):
         try:
             p = _resolve_under_prompt_dir(rel)
@@ -79,13 +75,9 @@ def validate_prompt_paths() -> list[str]:
 
 
 def load_named_prompt(key: str) -> str:
-    """从 prompt_files 或 recommend.reason_prompts 键加载正文。"""
+    """从 prompt_files 键加载正文。"""
     cfg = load_config()
     pf = cfg.get("prompt_files") or {}
     if key in pf:
         return load_prompt_file(str(pf[key]))
-    rec = cfg.get("recommend") or {}
-    rp = rec.get("reason_prompts") or {}
-    if key in rp:
-        return load_prompt_file(str(rp[key]))
     raise KeyError(f"unknown prompt key: {key}")

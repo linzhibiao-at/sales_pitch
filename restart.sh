@@ -40,12 +40,12 @@ sleep 1
 
 echo ""
 echo "=== 2. Git Pull ==="
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 git pull
 
 echo ""
 echo "=== 3. 启动 uvicorn ==="
-cd fila_agent_html
-nohup uvicorn backend.main:app --host 0.0.0.0 --port 8080 --workers 8 > fila_agent_html.log 2>&1 &
+source .venv/bin/activate
+nohup uvicorn backend.main:app --host 0.0.0.0 --port 8080 --workers 8 > sales_pitch.log 2>&1 &
 echo "uvicorn 已启动, PID: $!"
-echo "日志文件: $(pwd)/fila_agent_html.log"
+echo "日志文件: $(pwd)/sales_pitch.log"

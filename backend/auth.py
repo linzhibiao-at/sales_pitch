@@ -1,11 +1,11 @@
-"""API Key 鉴权 + 进程内限流排队（按 docs/FILA接口鉴权与限流方案.md）。
+"""API Key 鉴权 + 进程内限流排队（沿袭 docs/FILA接口鉴权与限流方案.md）。
 
 限流为**进程内**实现（不引 Redis；redis-py 未装/无 Redis 服务），对齐文档 5.5
-「Redis 不可用 → 降级为进程内 asyncio 信号量、可用性优先」。8 worker 下限流为
+「Redis 不可用 → 降级为进程内 asyncio 信号量、可用性优先」。多 worker 下限流为
 单进程近似，非全局精确。
 
-鉴权与 ``config.recommend.allowed_app_ids``（ISS-04）叠加：API Key 绑定 ``app_id``，
-``/v1/outfit/recommend`` 请求体内 ``app_id`` 须与 Key 绑定值一致。
+鉴权与顶层 ``allowed_app_ids`` 叠加：API Key 绑定 ``app_id``，
+``/v1/sales-pitch/generate`` 请求体内 ``app_id`` 须与 Key 绑定值一致。
 """
 
 from __future__ import annotations
@@ -20,39 +20,31 @@ from fastapi import HTTPException, Request
 
 from backend.config import get_auth_config, load_api_keys
 
-logger = logging.getLogger("fila_agent_html")
+logger = logging.getLogger(__name__)
 
-# 需鉴权的 4 个对外接口 → api_name
+# 需鉴权的对外接口 → api_name
 _ROUTE_API_NAME = {
-    "/v1/outfit/recommend": "recommend",
-    "/v1/outfit/regenerate-reason": "regenerate-reason",
-    "/api/outfits": "get_outfits",
+    "/v1/sales-pitch/generate": "sales_pitch",
 }
 
 
 def route_to_api_name(path: str) -> Optional[str]:
-    """路径 → api_name；``/skus/{sku_id}`` 用前缀匹配。非鉴权路径返回 None。"""
-    if path in _ROUTE_API_NAME:
-        return _ROUTE_API_NAME[path]
-    if path.startswith("/skus/"):
-        return "get_sku"
-    return None
+    """路径 → api_name；非鉴权路径返回 None。"""
+    return _ROUTE_API_NAME.get(path)
 
 
-# 鉴权作用于「对外 B2B 契约」接口：2 个 LLM 消费 POST 接口 + GET 查询接口
-# (/api/outfits、/skus/*)。ISS-08: GET 接口也需 X-API-Key 校验，与 POST 一致。
-# /spus/*、/outfits/*、/api/search-debug/*、/api/ui-config 等仍为前端/调试接口，
-# 浏览器无法持有 API Key，由网络层 ACL 兜底，不强制鉴权。
+# 鉴权作用于「对外 B2B 契约」接口（LLM 资源消费的 POST 接口）；
+# /health、/api/audit/* 为运维接口，浏览器/内网调用方无法持有 API Key，
+# 由网络层 ACL 兜底，不强制鉴权。
 PROTECTED_PATHS = frozenset(
-    {"/v1/outfit/recommend", "/v1/outfit/regenerate-reason", "/api/outfits"}
+    {
+        "/v1/sales-pitch/generate",
+    }
 )
-_PROTECTED_PREFIXES = ("/skus/",)
 
 
 def _is_protected(path: str) -> bool:
-    return path in PROTECTED_PATHS or any(
-        path.startswith(p) for p in _PROTECTED_PREFIXES
-    )
+    return path in PROTECTED_PATHS
 
 
 def _parse_expires(raw: Any) -> Optional[datetime]:
@@ -244,7 +236,7 @@ async def verify_api_key(request: Request):
     - 无 Key：``log_only`` 仅记日志，否则 401 ``API key required``
     - Key 无效/停用/过期 → 401 ``invalid API key``
     - 接口无权 → 403 ``access denied: api not allowed``
-    - recommend/regenerate 再做 QPM/日量 + 并发排队；GET 仅鉴权
+    - 话术生成接口再做 QPM/日量 + 并发排队
 
     非异常路径必到 yield（保证 FastAPI generator 依赖至少 yield 一次）；
     并发槽在 finally 释放。
@@ -287,8 +279,8 @@ async def verify_api_key(request: Request):
         app_id = key_info["app_id"]
         rl = key_info["rate_limit"]
 
-        # 仅 POST（LLM 资源）限流；GET 仅鉴权
-        if path in ("/v1/outfit/recommend", "/v1/outfit/regenerate-reason"):
+        # 仅 POST（LLM 资源）限流
+        if path == "/v1/sales-pitch/generate":
             _rate_limiter.check(app_id, rl["qpm"], rl["daily"])
             queue_info = await _concurrency_limiter.acquire(app_id, rl)
             acquired = True

@@ -26,7 +26,7 @@ from backend.auth import (
 KEY_MG = "ak_a1b2c3d4e5f6789012345678abcdef01"
 
 
-def _key(status="active", expires_at=None, allowed_apis=("recommend",)):
+def _key(status="active", expires_at=None, allowed_apis=("sales_pitch",)):
     return {
         "api_key": KEY_MG,
         "app_id": "micro_guide",
@@ -46,22 +46,18 @@ def _key(status="active", expires_at=None, allowed_apis=("recommend",)):
 
 class TestRouteToApiName(unittest.TestCase):
     def test_mapping(self):
-        self.assertEqual(route_to_api_name("/v1/outfit/recommend"), "recommend")
-        self.assertEqual(route_to_api_name("/v1/outfit/regenerate-reason"), "regenerate-reason")
-        self.assertEqual(route_to_api_name("/api/outfits"), "get_outfits")
-        self.assertEqual(route_to_api_name("/skus/F11W619219FPK"), "get_sku")
+        self.assertEqual(route_to_api_name("/v1/sales-pitch/generate"), "sales_pitch")
         self.assertIsNone(route_to_api_name("/health"))
+        self.assertIsNone(route_to_api_name("/api/audit/requests"))
 
-    def test_get_endpoints_protected(self):
-        """ISS-08: GET 接口 (/api/outfits, /skus/*) 也需鉴权。"""
+    def test_only_pitch_endpoint_protected(self):
+        """仅话术生成接口鉴权；运维/健康接口不拦。"""
         from backend.auth import _is_protected
-        self.assertTrue(_is_protected("/api/outfits"))
-        self.assertTrue(_is_protected("/skus/F11W619219FPK"))
-        # 前端/调试接口不鉴权
-        self.assertFalse(_is_protected("/api/ui-config"))
-        self.assertFalse(_is_protected("/api/outfits/sources"))
-        self.assertFalse(_is_protected("/spus/123/skus"))
-        self.assertFalse(_is_protected("/outfits/abc"))
+        self.assertTrue(_is_protected("/v1/sales-pitch/generate"))
+        # 运维/调试接口不鉴权（由网络层 ACL 兑底）
+        self.assertFalse(_is_protected("/health"))
+        self.assertFalse(_is_protected("/api/audit/requests"))
+        self.assertFalse(_is_protected("/docs"))
 
 
 class TestApiKeyStore(unittest.TestCase):
@@ -213,8 +209,8 @@ class TestVerifyApiKeyEndpoint(unittest.TestCase):
     def _client(self):
         app = FastAPI()
 
-        @app.post("/v1/outfit/recommend")
-        async def rec(request: Request, body: dict, _auth=Depends(verify_api_key)):
+        @app.post("/v1/sales-pitch/generate")
+        async def pitch(request: Request, body: dict, _auth=Depends(verify_api_key)):
             caller = getattr(request.state, "caller", None)
             if caller and body.get("app_id") != caller["app_id"]:
                 raise HTTPException(401, "app_id mismatch with API key")
@@ -225,7 +221,7 @@ class TestVerifyApiKeyEndpoint(unittest.TestCase):
     def _patches(self):
         return (
             patch("backend.auth.get_auth_config", side_effect=self._cfg_enabled),
-            patch("backend.auth.load_api_keys", return_value=[_key(allowed_apis=("recommend",))]),
+            patch("backend.auth.load_api_keys", return_value=[_key(allowed_apis=("sales_pitch",))]),
             patch("backend.auth._rate_limiter", RateLimiter()),
             patch("backend.auth._concurrency_limiter", ConcurrencyLimiter()),
         )
@@ -233,14 +229,14 @@ class TestVerifyApiKeyEndpoint(unittest.TestCase):
     def test_no_key_401(self):
         c = self._client()
         with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
-            r = c.post("/v1/outfit/recommend", json={"app_id": "micro_guide"})
+            r = c.post("/v1/sales-pitch/generate", json={"app_id": "micro_guide"})
         self.assertEqual(r.status_code, 401)
         self.assertIn("API key required", r.json()["detail"])
 
     def test_wrong_key_401(self):
         c = self._client()
         with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
-            r = c.post("/v1/outfit/recommend", json={"app_id": "micro_guide"},
+            r = c.post("/v1/sales-pitch/generate", json={"app_id": "micro_guide"},
                        headers={"X-API-Key": "ak_wrong"})
         self.assertEqual(r.status_code, 401)
         self.assertIn("invalid API key", r.json()["detail"])
@@ -248,14 +244,14 @@ class TestVerifyApiKeyEndpoint(unittest.TestCase):
     def test_valid_key_match_200(self):
         c = self._client()
         with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
-            r = c.post("/v1/outfit/recommend", json={"app_id": "micro_guide"},
+            r = c.post("/v1/sales-pitch/generate", json={"app_id": "micro_guide"},
                        headers={"X-API-Key": KEY_MG})
         self.assertEqual(r.status_code, 200)
 
     def test_app_id_mismatch_401(self):
         c = self._client()
         with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
-            r = c.post("/v1/outfit/recommend", json={"app_id": "wechat_mini"},
+            r = c.post("/v1/sales-pitch/generate", json={"app_id": "wechat_mini"},
                        headers={"X-API-Key": KEY_MG})
         self.assertEqual(r.status_code, 401)
         self.assertIn("app_id mismatch", r.json()["detail"])
@@ -263,21 +259,17 @@ class TestVerifyApiKeyEndpoint(unittest.TestCase):
     def test_disabled_no_enforcement(self):
         c = self._client()
         with patch("backend.auth.get_auth_config", return_value={**self._cfg_enabled(), "enabled": False}):
-            r = c.post("/v1/outfit/recommend", json={"app_id": "micro_guide"})
+            r = c.post("/v1/sales-pitch/generate", json={"app_id": "micro_guide"})
         self.assertEqual(r.status_code, 200)
 
     def test_access_denied_403(self):
         c = self._client()
-        # Key 仅允许 recommend；这里打 regenerate 路径(另建 mini app)
-        app = FastAPI()
-
-        @app.post("/v1/outfit/regenerate-reason")
-        async def reg(_auth=Depends(verify_api_key)):
-            return {"ok": True}
-
-        with self._patches()[0], self._patches()[1], self._patches()[2], self._patches()[3]:
-            r = TestClient(app).post("/v1/outfit/regenerate-reason", json={},
-                                     headers={"X-API-Key": KEY_MG})
+        # Key 仅允许 recommend（不含 sales_pitch）→ 403
+        with self._patches()[0], \
+             patch("backend.auth.load_api_keys", return_value=[_key(allowed_apis=("recommend",))]), \
+             self._patches()[2], self._patches()[3]:
+            r = c.post("/v1/sales-pitch/generate", json={"app_id": "micro_guide"},
+                       headers={"X-API-Key": KEY_MG})
         self.assertEqual(r.status_code, 403)
         self.assertIn("access denied", r.json()["detail"])
 

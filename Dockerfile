@@ -12,14 +12,9 @@ RUN pip install -r requirements.txt \
     && pip uninstall -y pytest
 
 COPY backend/ backend/
-COPY eval/ eval/
-COPY scripts/ scripts/
 COPY config.yaml .
 COPY config/ config/
 COPY prompt/ prompt/
-COPY web/ web/
-COPY image-debug-viewer/ image-debug-viewer/
-COPY outfits-viewer/ outfits-viewer/
 
 EXPOSE 8080
 

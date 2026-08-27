@@ -14,6 +14,5 @@ source .venv/bin/activate
 
 # Install dependencies
 uv pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-uv pip install -r fila_agent_html/requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 echo "Setup complete. Activate with: source .venv/bin/activate"

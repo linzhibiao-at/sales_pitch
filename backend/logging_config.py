@@ -230,14 +230,14 @@ def setup_logging(
     handler.setFormatter(fmt)
     handler.setLevel(log_level)
 
-    # fila_agent 命名空间（api_debug / jsonl_logger 等）
+    # fila_agent 命名空间（api_debug 等）
     fila_logger = logging.getLogger("fila_agent")
     fila_logger.handlers.clear()
     fila_logger.addHandler(handler)
     fila_logger.setLevel(log_level)
     fila_logger.propagate = False
 
-    # backend 命名空间（recommend_service / intent_engine 等业务模块）
+    # backend 命名空间（main / auth / services 等业务模块）
     backend_logger = logging.getLogger("backend")
     backend_logger.handlers.clear()
     backend_logger.addHandler(handler)
