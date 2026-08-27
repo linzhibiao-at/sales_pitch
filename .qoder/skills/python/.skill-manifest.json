@@ -1,0 +1,11 @@
+{
+  "name": "python",
+  "provider": "market",
+  "source_id": "SKILL-6a325ac25e4626-85111831",
+  "version": "unknown",
+  "installed_at": "2026-08-19T01:35:13Z",
+  "schema": 1,
+  "source_url": "https://tos-xiaoan-app.tos-cn-shanghai.volces.com/DT001/923531714930716674/2c17c6393771ee3048ae34d6b380c5ec/b40dc8619bfd479583d7251cbc06fe3b_python.zip",
+  "installed_by": "install_skills",
+  "checksum_sha256": ""
+}

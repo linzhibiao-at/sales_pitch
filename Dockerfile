@@ -14,7 +14,7 @@ RUN pip install -r requirements.txt \
 COPY backend/ backend/
 COPY config.yaml .
 COPY config/ config/
-COPY prompt/ prompt/
+COPY .sales_pitch/ .sales_pitch/
 
 EXPOSE 8080
 

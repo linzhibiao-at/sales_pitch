@@ -2,12 +2,10 @@
 
 import asyncio
 import unittest
-from unittest.mock import patch
 
 from pydantic import ValidationError
 
 from backend.auth import PROTECTED_PATHS, route_to_api_name
-from backend.llm_client import generate_sales_pitch
 from backend.models import (
     SalesPitchCustomerInfo,
     SalesPitchProductInfo,
@@ -178,43 +176,42 @@ class BuildRequirementsBlockTest(unittest.TestCase):
         self.assertNotIn("长度", b)
 
 
-# ── LLM 调用封装 ─────────────────────────────────────────────
+# ── Mock helpers（DeepAgent Agent mock）────────────────────
 
 
-class GenerateSalesPitchLlmTest(unittest.TestCase):
-    def test_ok(self) -> None:
-        with (
-            patch("backend.llm_client.load_named_prompt", return_value="SYS_PROMPT"),
-            patch("backend.llm_client._chat_block", return_value="  话术正文  ") as mock_chat,
-        ):
-            out = generate_sales_pitch("C_BLOCK", "P_BLOCK", "R_BLOCK")
-        self.assertEqual(out, "话术正文")
-        self.assertEqual(mock_chat.call_count, 1)
-        args, kwargs = mock_chat.call_args
-        self.assertEqual(args[0], "sales_pitch_llm")
-        self.assertEqual(kwargs.get("temperature"), 0.7)
-        messages = args[1]
-        self.assertEqual(messages[0], {"role": "system", "content": "SYS_PROMPT"})
-        self.assertEqual(messages[1], {"role": "user", "content": "C_BLOCK\n\nP_BLOCK\n\nR_BLOCK"})
+class _MockAIMessage:
+    """模拟 LangChain AIMessage / HumanMessage。"""
 
-    def test_empty_blocks_skipped(self) -> None:
-        with (
-            patch("backend.llm_client.load_named_prompt", return_value="SYS"),
-            patch("backend.llm_client._chat_block", return_value="ok") as mock_chat,
-        ):
-            generate_sales_pitch("", "P_BLOCK", "")
-        messages = mock_chat.call_args.args[1]
-        self.assertEqual(messages[1]["content"], "P_BLOCK")
-
-    def test_empty_output_returns_empty_str(self) -> None:
-        with (
-            patch("backend.llm_client.load_named_prompt", return_value="SYS"),
-            patch("backend.llm_client._chat_block", return_value=""),
-        ):
-            self.assertEqual(generate_sales_pitch("C", "P", "R"), "")
+    def __init__(self, content: str, msg_type: str = "ai") -> None:
+        self.content = content
+        self.type = msg_type
 
 
-# ── 服务层（stub 审计 + mock LLM）────────────────────────────
+class _MockAgent:
+    """模拟 DeepAgent CompiledGraph，支持 ``async ainvoke()``。"""
+
+    def __init__(self, response: str = "", *, error: Exception | None = None) -> None:
+        self._response = response
+        self._error = error
+        self.last_input: dict | None = None
+        self.last_config: dict | None = None
+        self.call_count = 0
+
+    async def ainvoke(self, input_dict: dict, *, config: dict | None = None) -> dict:
+        self.last_input = input_dict
+        self.last_config = config
+        self.call_count += 1
+        if self._error is not None:
+            raise self._error
+        messages = list(input_dict.get("messages", []))
+        if self._response:
+            messages.append(_MockAIMessage(self._response, "ai"))
+        else:
+            messages.append(_MockAIMessage("", "human"))
+        return {"messages": messages}
+
+
+# ── 服务层（mock Agent + stub 审计）──────────────────────
 
 
 class _FakeAudit:
@@ -226,11 +223,13 @@ class _FakeAudit:
         self.docs.append(doc)
 
 
-def _make_svc() -> SalesPitchService:
-    """绕过 __init__（避免真实 ES 连接），只装审计桩。"""
+def _make_svc(agent_response: str = "", *, agent_error: Exception | None = None):
+    """创建带 mock Agent + stub 审计的 SalesPitchService。"""
+    mock_agent = _MockAgent(agent_response, error=agent_error)
     svc = SalesPitchService.__new__(SalesPitchService)
+    svc._agent = mock_agent
     svc._audit = _FakeAudit()
-    return svc
+    return svc, mock_agent
 
 
 def _req(**overrides) -> SalesPitchRequest:
@@ -252,24 +251,25 @@ def _req(**overrides) -> SalesPitchRequest:
 
 class SalesPitchServiceGenerateTest(unittest.TestCase):
     def test_ok_result_and_audit(self) -> None:
-        svc = _make_svc()
-        with patch(
-            "backend.services.sales_pitch_service.generate_sales_pitch",
-            return_value="王女士，这件卫衣非常适合您的秋季通勤~",
-        ) as mock_gen:
-            out = asyncio.run(svc.generate(
-                _req(), trace_id="tid", app_id="micro_guide", caller="micro_guide",
-            ))
+        svc, mock_agent = _make_svc("王女士，这件卫衣非常适合您的秋季通勤~")
+        out = asyncio.run(svc.generate(
+            _req(), trace_id="tid", app_id="micro_guide", caller="micro_guide",
+        ))
         self.assertNotIn("error", out)
         self.assertEqual(out["pitch"], "王女士，这件卫衣非常适合您的秋季通勤~")
         self.assertEqual(out["session_id"], "sid-1")
         self.assertEqual(out["pitch_style"], "warm")
         self.assertIsInstance(out["model"], str)
-        # LLM 收到三个拼装好的文本块
-        c_block, p_block, r_block = mock_gen.call_args.args
-        self.assertIn("称呼: 王女士", c_block)
-        self.assertIn("FILA 经典卫衣", p_block)
-        self.assertIn("风格: 热情亲切", r_block)
+        # Agent 被调用一次，thread_id 映射到 session_id
+        self.assertEqual(mock_agent.call_count, 1)
+        self.assertEqual(
+            mock_agent.last_config, {"configurable": {"thread_id": "sid-1"}},
+        )
+        # 用户消息包含三个文本块
+        user_msg = mock_agent.last_input["messages"][0]["content"]
+        self.assertIn("称呼: 王女士", user_msg)
+        self.assertIn("FILA 经典卫衣", user_msg)
+        self.assertIn("风格: 热情亲切", user_msg)
         # 审计落库
         self.assertEqual(len(svc._audit.docs), 1)
         doc = svc._audit.docs[0]
@@ -280,52 +280,36 @@ class SalesPitchServiceGenerateTest(unittest.TestCase):
         self.assertEqual(doc["input"]["products"][0]["title"], "FILA 经典卫衣")
         self.assertEqual(doc["result"]["pitch"], out["pitch"])
 
-    def test_empty_llm_output_returns_error_doc(self) -> None:
-        svc = _make_svc()
-        with patch(
-            "backend.services.sales_pitch_service.generate_sales_pitch",
-            return_value="",
-        ):
-            out = asyncio.run(svc.generate(_req(), trace_id="tid"))
+    def test_empty_agent_output_returns_error_doc(self) -> None:
+        svc, _ = _make_svc("")  # 空响应 → 无 AI 消息
+        out = asyncio.run(svc.generate(_req(), trace_id="tid"))
         self.assertIn("error", out)
         doc = svc._audit.docs[0]
         self.assertEqual(doc["status"], "error")
         self.assertEqual(doc["result"]["error"], out["error"])
 
     def test_exception_reraised_and_audited(self) -> None:
-        svc = _make_svc()
-        with patch(
-            "backend.services.sales_pitch_service.generate_sales_pitch",
-            side_effect=RuntimeError("boom"),
-        ):
-            with self.assertRaises(RuntimeError):
-                asyncio.run(svc.generate(_req(), trace_id="tid"))
+        svc, _ = _make_svc("", agent_error=RuntimeError("boom"))
+        with self.assertRaises(RuntimeError):
+            asyncio.run(svc.generate(_req(), trace_id="tid"))
         doc = svc._audit.docs[0]
         self.assertEqual(doc["status"], "error")
         self.assertIn("RuntimeError", str(doc["error"]))
 
     def test_audit_disabled_skips_write(self) -> None:
-        svc = _make_svc()
+        svc, _ = _make_svc("话术")
         svc._audit.enabled = False
-        with patch(
-            "backend.services.sales_pitch_service.generate_sales_pitch",
-            return_value="话术",
-        ):
-            asyncio.run(svc.generate(_req(), trace_id="tid"))
+        asyncio.run(svc.generate(_req(), trace_id="tid"))
         self.assertEqual(svc._audit.docs, [])
 
     def test_no_customer_still_works(self) -> None:
-        svc = _make_svc()
-        with patch(
-            "backend.services.sales_pitch_service.generate_sales_pitch",
-            return_value="通用话术",
-        ) as mock_gen:
-            out = asyncio.run(svc.generate(
-                _req(customer=None), trace_id="tid",
-            ))
+        svc, mock_agent = _make_svc("通用话术")
+        out = asyncio.run(svc.generate(
+            _req(customer=None), trace_id="tid",
+        ))
         self.assertEqual(out["pitch"], "通用话术")
-        c_block = mock_gen.call_args.args[0]
-        self.assertEqual(c_block, "")
+        user_msg = mock_agent.last_input["messages"][0]["content"]
+        self.assertNotIn("【顾客信息】", user_msg)
 
 
 # ── 审计文档构建（纯函数）────────────────────────────────────

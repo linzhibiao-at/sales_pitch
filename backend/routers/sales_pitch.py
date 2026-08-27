@@ -1,4 +1,8 @@
-"""营销话术路由：POST /v1/sales-pitch/generate。"""
+"""营销话术路由：POST /v1/sales-pitch/generate。
+
+模块级初始化 DeepAgent 基础设施（Redis → LLM → Agent → Service），
+Redis 不可用时降级为 503。
+"""
 
 from __future__ import annotations
 
@@ -17,12 +21,30 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
+def _init_agent_stack() -> SalesPitchService | None:
+    """初始化 Redis → LLM → Agent → Service；Redis 不可用返回 None。"""
+    try:
+        from backend.infra.redis import init_redis
+        from backend.llm.factory import create_sales_pitch_llm
+        from backend.agent.loader import load_resources, build_agent
+
+        redis_client, checkpointer, store, store_backend = init_redis()
+        load_resources(store)
+        llm = create_sales_pitch_llm()
+        agent = build_agent(llm, store_backend, store, checkpointer)
+        return SalesPitchService(agent=agent)
+    except Exception as e:
+        logger.error("[router] Agent 初始化失败（服务降级）: %s", e, exc_info=True)
+        return None
+
+
 # 进程级服务单例（与 worker 生命周期一致）
-_pitch_svc = SalesPitchService()
+_pitch_svc: SalesPitchService | None = _init_agent_stack()
 
 
-def get_pitch_service() -> SalesPitchService:
-    """暴露给测试/其他路由获取服务实例（避免跨模块访问私有变量）。"""
+def get_pitch_service() -> SalesPitchService | None:
+    """暴露给测试/其他路由获取服务实例。"""
     return _pitch_svc
 
 
@@ -38,6 +60,11 @@ async def v1_sales_pitch_generate(
     _auth: None = Depends(verify_api_key),
 ) -> dict:
     """对外营销话术生成接口：顾客信息 + 商品信息 → 导购话术。"""
+    if _pitch_svc is None:
+        raise HTTPException(
+            status_code=503,
+            detail="agent service unavailable (Redis or LLM init failed)",
+        )
     app_id = (body.app_id or "").strip()
     if not app_id:
         raise HTTPException(status_code=400, detail="app_id required")
@@ -60,7 +87,7 @@ async def v1_sales_pitch_generate(
         app_id=app_id,
         caller=caller_app_id,
     )
-    # LLM 空输出/上游故障 → 503（依赖服务不可用），带 trace_id 供联查
+    # Agent 空输出/上游故障 → 503（依赖服务不可用），带 trace_id 供联查
     if "error" in out:
         raise HTTPException(status_code=503, detail=out["error"])
     out["trace_id"] = _request_trace_id(request)

@@ -26,25 +26,40 @@ auth:
 
 paths:
   logs_dir: "data/logs"
-  prompt_dir: "prompt"
 
-prompt_files:
-  sales_pitch: "prompt/sales_pitch.md"
+# Agent 资源目录（DeepAgent Harness）
+# AGENTS.md / SOUL.md / skills 在此目录下，启动时加载到 RedisStore
+agent:
+  resource_dir: ".sales_pitch"
 
 models:
-  # 营销话术生成（/v1/sales-pitch/generate）：创意生成任务，temperature 在调用侧调高
+  # 营销话术生成：双通道 LLM（DashScope 主 + 安踏 AI 网关 fallback）
   sales_pitch_llm:
-    provider: openai_compatible
-    mode: local
-    base_url: "https://ai.anta.com/aimodels-server/private/llm/v1"
-    api_key_env: "ANTA_LLM_API_KEY"
-    model: "qwen3.5-flash"
-    timeout_sec: 120
-    enable_thinking: false
-    max_tokens: 2048
-    max_retries: 2          # 单模型重试次数；耗尽后按 fallback_models 换模型再调
-    retry_delay_sec: 2
-    fallback_models: ["qwen3.7-plus"]
+    primary:
+      provider: dashscope
+      model: "qwen-plus"
+      api_key_env: "DASHSCOPE_API_KEY"
+      base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      max_tokens: 2048
+      enable_thinking: false
+    fallback:
+      provider: openai_compatible
+      base_url: "https://ai.anta.com/aimodels-server/private/llm/v1"
+      api_key_env: "ANTA_LLM_API_KEY"
+      model: "qwen3.5-flash"
+      max_tokens: 2048
+    # 上下文压缩配置（SummarizationMiddleware）
+    summarization:
+      model: "qwen-turbo"           # 压缩用便宜模型
+      trigger_tokens: 50000         # 超此 token 数触发压缩
+      keep_messages: 10             # 压缩后保留最近消息数
+
+# Redis：DeepAgent checkpointer（短期记忆）+ store（长期记忆）
+# 环境变量 REDIS_HOST / REDIS_PORT 可覆盖
+redis:
+  host: "localhost"
+  port: 6379
+  db: 0
 
 elasticsearch:
   enabled: false

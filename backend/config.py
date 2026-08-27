@@ -152,6 +152,50 @@ def load_api_keys(cfg: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
     return keys
 
 
+# ---------- Redis（DeepAgent 记忆 / checkpointer） ----------
+def get_redis_host(cfg: Optional[dict[str, Any]] = None) -> str:
+    """Redis 主机：优先环境变量 ``REDIS_HOST``，否则 ``config.yaml`` 的 ``redis.host``。"""
+    raw = (os.environ.get("REDIS_HOST") or "").strip()
+    if raw:
+        return raw
+    data = cfg if cfg is not None else load_config()
+    return str((data.get("redis") or {}).get("host") or "localhost")
+
+
+def get_redis_port(cfg: Optional[dict[str, Any]] = None) -> int:
+    """Redis 端口：优先环境变量 ``REDIS_PORT``，否则 ``config.yaml`` 的 ``redis.port``。"""
+    raw = (os.environ.get("REDIS_PORT") or "").strip()
+    if raw:
+        return int(raw)
+    data = cfg if cfg is not None else load_config()
+    return int((data.get("redis") or {}).get("port") or 6379)
+
+
+def get_redis_db(cfg: Optional[dict[str, Any]] = None) -> int:
+    """Redis DB 编号：``config.yaml`` 的 ``redis.db``，默认 0。"""
+    data = cfg if cfg is not None else load_config()
+    return int((data.get("redis") or {}).get("db") or 0)
+
+
+def get_agent_resource_dir(cfg: Optional[dict[str, Any]] = None) -> Path:
+    """Agent 资源目录（.sales_pitch/）的绝对路径。"""
+    data = cfg if cfg is not None else load_config()
+    rel = str((data.get("agent") or {}).get("resource_dir") or ".sales_pitch")
+    return _ROOT / rel
+
+
+def get_summarization_config(cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """上下文压缩配置（SummarizationMiddleware）。"""
+    data = cfg if cfg is not None else load_config()
+    mcfg = (data.get("models") or {}).get("sales_pitch_llm") or {}
+    sc = mcfg.get("summarization") or {}
+    return {
+        "model": str(sc.get("model") or "qwen-turbo"),
+        "trigger_tokens": int(sc.get("trigger_tokens") or 50000),
+        "keep_messages": int(sc.get("keep_messages") or 10),
+    }
+
+
 # ---------- Elasticsearch（仅请求审计落库） ----------
 def get_elasticsearch_hosts(cfg: Optional[dict[str, Any]] = None) -> list[str]:
     """ES 节点：优先环境变量 ``ES_HOSTS``（逗号分隔），否则用 ``config.yaml`` 的

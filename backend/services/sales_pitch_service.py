@@ -1,8 +1,7 @@
-"""营销话术生成服务：顾客信息 + 商品信息 → LLM 导购话术 + 审计落库。"""
+"""营销话术生成服务：顾客信息 + 商品信息 → DeepAgent 导购话术 + 审计落库。"""
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import uuid
@@ -10,7 +9,6 @@ from time import perf_counter
 from typing import Any
 
 from backend.config import load_config
-from backend.llm_client import generate_sales_pitch
 from backend.models import SalesPitchCustomerInfo, SalesPitchProductInfo, SalesPitchRequest
 from backend.services.request_audit import (
     RequestAuditLogger,
@@ -132,9 +130,15 @@ def build_requirements_block(req: SalesPitchRequest) -> str:
 
 
 class SalesPitchService:
-    """营销话术生成：入参归一化 → prompt 文本块 → LLM → 出参 + 审计。"""
+    """营销话术生成：入参归一化 → 文本块 → DeepAgent → 出参 + 审计。
 
-    def __init__(self) -> None:
+    ``agent`` 为 DeepAgent CompiledGraph（由 ``build_agent()`` 创建），
+    ``session_id`` 映射到 LangGraph ``thread_id``，同 session 自动共享
+    对话历史，``SummarizationMiddleware`` 负责上下文压缩。
+    """
+
+    def __init__(self, agent: Any) -> None:
+        self._agent = agent
         self._audit = RequestAuditLogger()
 
     async def generate(
@@ -145,7 +149,7 @@ class SalesPitchService:
         app_id: str | None = None,
         caller: str | None = None,
     ) -> dict[str, Any]:
-        """生成话术；LLM 空输出时返回 ``{"error": ...}``（路由层转 5xx）。"""
+        """生成话术；Agent 空输出时返回 ``{"error": ...}``（路由层转 5xx）。"""
         t0 = perf_counter()
         session_id = (req.session_id or "").strip() or uuid.uuid4().hex
         status = "ok"
@@ -161,15 +165,28 @@ class SalesPitchService:
                 trace_id, app_id, len(req.products),
                 bool(customer_block), req.pitch_style or "-", req.channel or "-",
             )
-            # _chat_block 为同步阻塞调用，to_thread 避免卡住事件循环
-            pitch = await asyncio.to_thread(
-                generate_sales_pitch,
-                customer_block, products_block, requirements_block,
+            # 拼装用户消息（复用现有文本块构建函数）
+            user_msg = "\n\n".join(
+                p for p in (customer_block, products_block, requirements_block) if p
             )
+            # session_id → thread_id：同 session 自动共享对话历史
+            config = {"configurable": {"thread_id": session_id}}
+            agent_result = await self._agent.ainvoke(
+                {"messages": [{"role": "user", "content": user_msg}]},
+                config=config,
+            )
+            # 提取最后一条 AI 消息作为话术
+            messages = agent_result.get("messages", [])
+            pitch = ""
+            for msg in reversed(messages):
+                content = getattr(msg, "content", "") or ""
+                if content and getattr(msg, "type", "") == "ai":
+                    pitch = content.strip()
+                    break
             if not pitch:
                 status = "error"
-                error = "sales pitch generation failed (empty LLM output)"
-                logger.error("[营销话术] LLM 空输出 trace_id=%s", trace_id)
+                error = "sales pitch generation failed (empty agent output)"
+                logger.error("[营销话术] Agent 空输出 trace_id=%s", trace_id)
                 result = {"error": error}
                 return result
             result = {
@@ -191,7 +208,8 @@ class SalesPitchService:
 
     def _model_name(self) -> str:
         mcfg = (load_config().get("models") or {}).get("sales_pitch_llm") or {}
-        return str(mcfg.get("model") or "")
+        primary = mcfg.get("primary") or {}
+        return str(primary.get("model") or "")
 
     def _write_audit(
         self,

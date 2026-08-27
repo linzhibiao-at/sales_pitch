@@ -31,14 +31,9 @@ from backend.api_debug import (
     log_flow,
     redact_for_log,
 )
-from backend.prompt_loader import validate_prompt_paths
 from backend.routers import audit, sales_pitch,user
 
 logger = logging.getLogger(__name__)
-
-errs = validate_prompt_paths()
-if errs:
-    logger.warning("prompt 校验未通过（服务仍启动，LLM 可能失败）: %s", errs)
 
 app = FastAPI(title="FILA Sales Pitch Service", version="0.1.0")
 app.add_middleware(

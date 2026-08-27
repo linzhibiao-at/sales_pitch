@@ -245,6 +245,7 @@ def setup_logging(
     backend_logger.propagate = False
 
     # httpx / openai 等第三方库日志降级，减少噪音
-    for noisy in ("httpx", "httpcore", "openai", "elasticsearch", "urllib3"):
+    for noisy in ("httpx", "httpcore", "openai", "elasticsearch", "urllib3",
+                   "langchain", "langgraph", "deepagents", "redis"):
         lg = logging.getLogger(noisy)
         lg.setLevel(logging.WARNING)
