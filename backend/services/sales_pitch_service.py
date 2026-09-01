@@ -223,7 +223,7 @@ class SalesPitchService:
         caller: str | None,
         t0: float,
     ) -> None:
-        """拼 sales_pitch 审计文档并写 ES；关闭/失败均静默。"""
+        """拼 sales_pitch 审计文档并写 MySQL；关闭/失败均静默。"""
         if not self._audit.enabled:
             return
         try:

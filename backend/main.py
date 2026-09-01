@@ -3,9 +3,9 @@
 架构分层
     main.py                    ← app 骨架 / 中间件 / 异常处理器 / 路由挂载
     routers/sales_pitch.py     ← POST /v1/sales-pitch/generate
-    routers/audit.py           ← GET /api/audit/requests[/{trace_id}]
+    routers/audit.py           ← GET /v1/audit/requests[/{trace_id}]
     services/sales_pitch_service.py  ← 业务编排（prompt → LLM → 审计）
-    services/request_audit.py  ← 审计文档构造 + ES 写/查
+    services/request_audit.py  ← 审计文档构造 + MySQL 写/查
 """
 
 from __future__ import annotations

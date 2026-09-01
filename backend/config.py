@@ -196,99 +196,26 @@ def get_summarization_config(cfg: Optional[dict[str, Any]] = None) -> dict[str, 
     }
 
 
-# ---------- Elasticsearch（仅请求审计落库） ----------
-def get_elasticsearch_hosts(cfg: Optional[dict[str, Any]] = None) -> list[str]:
-    """ES 节点：优先环境变量 ``ES_HOSTS``（逗号分隔），否则用 ``config.yaml`` 的
-    ``elasticsearch.hosts``。
+# ---------- MySQL（请求审计落库） ----------
+def get_mysql_url(cfg: Optional[dict[str, Any]] = None) -> str:
+    """MySQL 连接串：优先 ``MYSQL_URL`` 环境变量，否则 ``config.yaml`` 的
+    ``mysql.url``。
     """
-    raw = (os.environ.get("ES_HOSTS") or "").strip()
+    raw = (os.environ.get("MYSQL_URL") or "").strip()
     if raw:
-        return [h.strip() for h in raw.split(",") if h.strip()]
+        return raw
     data = cfg if cfg is not None else load_config()
-    es_cfg = data.get("elasticsearch") or {}
-    hosts = es_cfg.get("hosts") or ["http://127.0.0.1:9200"]
-    if isinstance(hosts, str):
-        h = hosts.strip()
-        return [h] if h else ["http://127.0.0.1:9200"]
-    if not hosts:
-        return ["http://127.0.0.1:9200"]
-    return list(hosts)
+    return str((data.get("mysql") or {}).get("url") or "")
 
 
-def get_elasticsearch_indices(
-    cfg: Optional[dict[str, Any]] = None,
-) -> dict[str, str]:
-    """ES 索引名，仅来自 ``config.yaml`` 的 ``elasticsearch.indices``。
-
-    仅 ``requests``（请求审计）为必需键；未配置或为空时返回空 dict，
-    审计写入静默降级。
-    """
+def get_mysql_table(cfg: Optional[dict[str, Any]] = None) -> str:
+    """审计表名：``config.yaml`` 的 ``mysql.table``，默认 ``request_audit``。"""
     data = cfg if cfg is not None else load_config()
-    idx = (data.get("elasticsearch") or {}).get("indices") or {}
-    out: dict[str, str] = {}
-    requests = str(idx.get("requests") or "").strip()
-    if requests:
-        out["requests"] = requests
-    return out
+    return str((data.get("mysql") or {}).get("table") or "request_audit")
 
 
 def get_request_audit_enabled(cfg: Optional[dict[str, Any]] = None) -> bool:
-    """对外请求审计落库开关（elasticsearch.request_audit.enabled，缺省 True）。"""
+    """对外请求审计落库开关（``request_audit.enabled``，缺省 True）。"""
     data = cfg if cfg is not None else load_config()
-    es = data.get("elasticsearch") or {}
-    ra = es.get("request_audit") or {}
+    ra = data.get("request_audit") or {}
     return bool(ra.get("enabled", True))
-
-
-def elasticsearch_major_version() -> int:
-    """已安装 elasticsearch-py 主版本号（7 或 8）。"""
-    try:
-        import elasticsearch
-
-        ver = elasticsearch.__version__
-        if isinstance(ver, tuple):
-            return int(ver[0])
-        text = str(ver).strip()
-        if text.startswith("("):
-            return int(text.strip("()").split(",")[0].strip())
-        return int(text.split(".")[0])
-    except Exception:
-        return 7
-
-
-def _disable_elasticsearch_product_check() -> None:
-    """ES 7.x OSS（build_flavor=oss）会触发 7.14+ 客户端的产品校验失败。"""
-    try:
-        from elasticsearch import transport as es_transport
-
-        checker = es_transport._ProductChecker
-
-        @classmethod
-        def _always_success(cls, headers, response):  # noqa: ARG001
-            return checker.SUCCESS
-
-        checker.check_product = _always_success
-    except Exception:
-        pass
-
-
-def create_elasticsearch_client(
-    hosts: list[str],
-    *,
-    username: str = "",
-    password: str = "",
-    timeout_sec: int = 30,
-) -> Any:
-    """构造 ES7 客户端；项目固定使用 elasticsearch-py 7.x（ES 7.9）。"""
-    from elasticsearch import Elasticsearch
-
-    _disable_elasticsearch_product_check()
-    # 阿里云 ES HTTPS 在容器内常缺中间 CA；临时关闭校验（等同 curl -k）
-    kw: dict[str, Any] = {
-        "timeout": timeout_sec,
-        "verify_certs": False,
-        "ssl_show_warn": False,
-    }
-    if username:
-        kw["http_auth"] = (username, password)
-    return Elasticsearch(hosts, **kw)

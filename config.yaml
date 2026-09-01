@@ -37,8 +37,8 @@ models:
   sales_pitch_llm:
     primary:
       provider: dashscope
-      model: "qwen-plus"
-      api_key_env: "DASHSCOPE_API_KEY"
+      model: "qwen3.8-27b"
+      api_key_env: "sk-33d77aea509749c4909d8fb5e8afddff"
       base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       max_tokens: 2048
       enable_thinking: false
@@ -61,22 +61,15 @@ redis:
   port: 6379
   db: 0
 
-elasticsearch:
-  enabled: false
-  # 环境变量 ES_HOSTS 可覆盖（逗号分隔多节点）
-  hosts:
-    - "https://es-cn-4ta4vp6dm00010t6f.elasticsearch.aliyuncs.com:9200"
-  # 账号通过环境变量注入，勿写入本文件：
-  #   export ES_USERNAME=maiamgs-dev
-  #   export ES_PASSWORD='...'   # 含 # 等特殊字符须单引号
-  username_env: "ES_USERNAME"
-  password_env: "ES_PASSWORD"
-  indices:
-    # 对外请求审计落库（输入/结果），需预先在该集群创建
-    requests: "umalog-q-maiamgs-index-fila-requests"
-  # 对外请求审计开关：false 时既不写也不查（查询 API 返空/503）
-  request_audit:
-    enabled: true
+# MySQL：请求审计落库（环境变量 MYSQL_URL 可覆盖连接串）
+# url 为空时不建连接，审计写/查静默降级；启动时自动建表 request_audit
+mysql:
+  url: "mysql+pymysql://root:123456@host:3306/fila_sales_pitch?charset=utf8mb4"   # 例：mysql+pymysql://user:pass@host:3306/fila_sales_pitch?charset=utf8mb4
+  table: "request_audit"
+
+# 对外请求审计开关：false 时既不写也不查（查询 API 返空/503）
+request_audit:
+  enabled: true
 
 logging:
   level: "INFO"

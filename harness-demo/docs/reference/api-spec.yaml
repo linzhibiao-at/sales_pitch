@@ -1,0 +1,213 @@
+x-last-updated: 2026-03-28
+x-status: active
+x-owner: '@Jack'
+openapi: 3.0.3
+info:
+  title: Harness Demo API
+  version: 0.1.0
+  description: 面向中小企业在线项目管理平台的 API 规范草案。
+servers:
+  - url: /api
+paths:
+  /auth/login:
+    post:
+      summary: 用户登录
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/me:
+    get:
+      summary: 获取当前用户
+      tags:
+        - Auth
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /projects/search:
+    post:
+      summary: 搜索项目
+      tags:
+        - Project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectSearchRequest'
+      responses:
+        '200':
+          description: 项目分页结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectSearchResponse'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /billing/orders:
+    post:
+      summary: 创建计费订单
+      tags:
+        - Billing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateOrderResponse'
+        '400':
+          description: 参数错误或业务错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          maxLength: 30
+        password:
+          type: string
+          format: password
+          maxLength: 100
+    LoginResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: OK
+        token:
+          type: string
+        expiresIn:
+          type: integer
+          format: int64
+    CurrentUserResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    ProjectSearchRequest:
+      type: object
+      properties:
+        keyword:
+          type: string
+          maxLength: 100
+        status:
+          type: string
+        pageNum:
+          type: integer
+          minimum: 1
+          default: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        sortBy:
+          type: string
+          example: createTime
+        sortOrder:
+          type: string
+          enum:
+            - asc
+            - desc
+          default: desc
+    ProjectSearchResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              projectId:
+                type: integer
+                format: int64
+              projectName:
+                type: string
+              status:
+                type: string
+    CreateOrderRequest:
+      type: object
+      required:
+        - planCode
+      properties:
+        planCode:
+          type: string
+          maxLength: 64
+    CreateOrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: integer
+          format: int64
+        status:
+          type: string
+          example: CREATED
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: SYS_500
+        message:
+          type: string
+        requestId:
+          type: string

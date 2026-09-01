@@ -1,0 +1,60 @@
+name: Agent Guardrails
+
+on: [pull_request]
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 1.8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+          cache: maven
+
+      # GitHub Actions runner 默认 Maven 版本可能与基线不一致，强制对齐 3.6.3
+      - name: Set up Maven 3.6.3
+        uses: stCarolas/setup-maven@v5
+        with:
+          maven-version: 3.6.3
+
+      - name: Verify tooling
+        run: |
+          java -version
+          mvn -v
+
+      # 编译 + 单测 + Checkstyle + SpotBugs + JaCoCo (>= 80%) + ArchUnit
+      # 全部绑定到 verify 阶段，一次执行；enforcer 会顺带验证 Maven/JDK 版本
+      - name: Build & Verify
+        run: mvn -B clean verify
+
+      - name: Architecture Check (ArchUnit, 单独打日志)
+        run: mvn -B test -Dtest='*ArchTest,LayerDependencyTest'
+
+      - name: File Size Check
+        shell: bash
+        run: |
+          find src/main/java -name '*.java' | while read f; do
+            lines=$(wc -l < "$f")
+            if [ "$lines" -gt 300 ]; then
+              echo "❌ $f 有 $lines 行（上限 300）"
+              echo "✅ FIX: 拆分为更小的类，将辅助方法移至 *Helper 或 infrastructure。"
+              echo "📖 See: docs/conventions/file-size.md"
+              exit 1
+            fi
+          done
+
+      - name: Doc Freshness
+        shell: bash
+        run: |
+          find docs/design/ -name '*.md' | while read f; do
+            last_mod=$(git log -1 --format=%ct "$f")
+            now=$(date +%s)
+            days_old=$(( (now - last_mod) / 86400 ))
+            if [ "$days_old" -gt 60 ]; then
+              echo "⚠️ $f 已 ${days_old} 天未更新，可能已过期"
+            fi
+          done

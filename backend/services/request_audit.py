@@ -1,4 +1,4 @@
-"""对外请求审计落库到 ES（fila-requests 索引）。
+"""对外请求审计落库到 MySQL（request_audit 表）。
 
 纯函数 build_*_doc 便于单测；RequestAuditLogger 负责写/查，失败静默降级。
 """
@@ -58,56 +58,56 @@ def build_sales_pitch_doc(
     }
 
 
-def build_audit_search_body(filters: dict[str, Any]) -> dict[str, Any]:
-    """构造审计列表查询 body：字符串字段走 .keyword 精确匹配 + ts 倒序 + 分页。"""
-    must: list[dict[str, Any]] = []
+def build_audit_query(filters: dict[str, Any]) -> tuple[str, list[Any], int, int]:
+    """构造审计列表 SQL 条件：返回 ``(WHERE, params, limit, offset)``。"""
+    clauses: list[str] = []
+    params: list[Any] = []
 
-    def add_term(field: str, val: Any) -> None:
+    for col, key in [
+        ("trace_id", "trace_id"),
+        ("app_id", "app_id"),
+        ("session_id", "session_id"),
+        ("request_kind", "request_kind"),
+        ("status", "status"),
+    ]:
+        val = filters.get(key)
         if val:
-            must.append({"term": {f"{field}.keyword": str(val)}})
+            clauses.append(f"{col} = %s")
+            params.append(str(val))
 
-    add_term("trace_id", filters.get("trace_id"))
-    add_term("app_id", filters.get("app_id"))
-    add_term("session_id", filters.get("session_id"))
-    add_term("request_kind", filters.get("request_kind"))
-    add_term("status", filters.get("status"))
+    ts_from = filters.get("ts_from")
+    if ts_from:
+        clauses.append("ts >= %s")
+        params.append(str(ts_from))
+    ts_to = filters.get("ts_to")
+    if ts_to:
+        clauses.append("ts <= %s")
+        params.append(str(ts_to))
 
-    rng: dict[str, Any] = {}
-    if filters.get("ts_from"):
-        rng["gte"] = str(filters["ts_from"])
-    if filters.get("ts_to"):
-        rng["lte"] = str(filters["ts_to"])
-    if rng:
-        must.append({"range": {"ts": rng}})
+    where = "WHERE " + " AND ".join(clauses) if clauses else ""
 
-    query: dict[str, Any]
-    if must:
-        query = {"bool": {"must": must}}
-    else:
-        query = {"match_all": {}}
-
-    size = max(1, min(int(filters.get("size") or 50), 200))
+    limit = max(1, min(int(filters.get("size") or 50), 200))
     offset = max(0, int(filters.get("offset") or 0))
-    return {
-        "size": size,
-        "from": offset,
-        "query": query,
-        "sort": [{"ts": {"order": "desc"}}],
-    }
+
+    return where, params, limit, offset
 
 
 def slim_audit_row(src: dict[str, Any]) -> dict[str, Any]:
-    """审计列表精简行（详情另调 /api/audit/requests/{trace_id}）。"""
+    """审计列表精简行（详情另调 /v1/audit/requests/{trace_id}）。"""
     result = src.get("result") or {}
     input_block = src.get("input") or {}
+    pitch = str(result.get("pitch") or "")
     return {
         "trace_id": src.get("trace_id"),
         "session_id": src.get("session_id"),
         "app_id": src.get("app_id"),
         "request_kind": src.get("request_kind"),
         "ts": src.get("ts"),
+        "created_at": src.get("created_at") or src.get("ts"),
         "elapsed_ms": src.get("elapsed_ms"),
         "status": src.get("status"),
+        "pitch_style": input_block.get("pitch_style"),
+        "pitch": pitch[:80],
         "product_count": len(input_block.get("products") or []),
         "has_customer": bool(input_block.get("customer")),
         "pitch_len": result.get("pitch_len") or 0,
@@ -115,26 +115,29 @@ def slim_audit_row(src: dict[str, Any]) -> dict[str, Any]:
 
 
 class RequestAuditLogger:
-    """对外请求审计 ES 写/查；不可用或关闭时静默降级。"""
+    """对外请求审计 MySQL 写/查；不可用或关闭时静默降级。"""
 
     def __init__(
         self,
-        es: Any = None,
+        client: Any = None,
         enabled: Optional[bool] = None,
     ) -> None:
-        if es is not None:
-            self._es = es
-        else:
-            from backend.es_client import EsClient
-            self._es = EsClient()
         self._enabled = (
             get_request_audit_enabled() if enabled is None else bool(enabled)
         )
+        if client is not None:
+            self._client = client
+        elif self._enabled:
+            from backend.infra.mysql import MysqlClient
+            self._client = MysqlClient()
+        else:
+            # 审计关闭时不建连接，避免无谓的 MySQL 握手
+            self._client = None
 
     @property
     def enabled(self) -> bool:
         return bool(self._enabled) and bool(
-            getattr(self._es, "available", False),
+            getattr(self._client, "available", False),
         )
 
     def write(self, doc: dict[str, Any]) -> None:
@@ -142,24 +145,37 @@ class RequestAuditLogger:
         if not self._enabled:
             return
         try:
-            self._es.index_doc("requests", doc, refresh=False)
+            self._client.insert_audit(doc)
         except Exception:  # noqa: BLE001
             logger.warning("request audit write failed", exc_info=True)
 
-    def search(self, body: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    def search(
+        self,
+        where: str,
+        params: list | tuple,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """按条件查询审计列表（ts 倒序）。"""
         if not self.enabled:
             return []
         try:
-            return self._es.search_docs("requests", body)
+            return self._client.query_audit(where, params, limit, offset)
         except Exception:  # noqa: BLE001
             logger.warning("request audit search failed", exc_info=True)
             return []
 
+    def count(self, where: str, params: list | tuple) -> int:
+        """按条件统计总数。"""
+        if not self.enabled:
+            return 0
+        try:
+            return self._client.count_audit(where, params)
+        except Exception:  # noqa: BLE001
+            logger.warning("request audit count failed", exc_info=True)
+            return 0
+
     def get_by_trace_id(self, trace_id: str) -> Optional[dict[str, Any]]:
         if not self.enabled or not trace_id:
             return None
-        rows = self.search({
-            "size": 1,
-            "query": {"term": {"trace_id.keyword": str(trace_id)}},
-        })
-        return rows[0][1] if rows else None
+        return self._client.get_by_trace_id(trace_id)

@@ -28,10 +28,8 @@ spec:
             value: "localhost"
           - name: REDIS_PORT
             value: "6379"
-          - name: ES_USERNAME
-            value: ""
-          - name: ES_PASSWORD
-            value: ""
+          - name: MYSQL_URL
+            value: ""   # 例：mysql+pymysql://user:pass@mysql-host:3306/fila_sales_pitch?charset=utf8mb4
         ports:
           - containerPort: 8080
         imagePullPolicy: Always
