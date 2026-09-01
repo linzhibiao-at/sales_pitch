@@ -1,9 +1,0 @@
-com\example\app\mapper\package-info.class
-com\example\app\controller\package-info.class
-com\example\app\infrastructure\package-info.class
-com\example\app\domain\model\package-info.class
-com\example\app\TaskappApplication.class
-com\example\app\domain\package-info.class
-com\example\app\config\package-info.class
-com\example\app\domain\dto\package-info.class
-com\example\app\service\package-info.class

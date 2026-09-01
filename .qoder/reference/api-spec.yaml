@@ -1,0 +1,231 @@
+x-last-updated: 2026-09-01
+x-status: active
+x-owner: '@linzhibiao'
+openapi: 3.0.3
+info:
+  title: FILA Sales Pitch Service API
+  version: 0.1.0
+  description: |
+    FILA 营销话术生成服务 API 规范（与 backend/routers/ 实现一一对应）。
+    错误统一信封 {code, message, trace_id}，错误码字典见 error-codes.md。
+    鉴权：config.yaml auth.enabled=true 时，受保护接口须带 X-API-Key 头。
+paths:
+  /v1/sales-pitch/generate:
+    post:
+      summary: 生成营销话术（顾客画像 + 商品信息 → 导购话术）
+      tags: [sales_pitch]
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: X-API-Key
+          in: header
+          required: false   # auth.enabled=true 时必填；log_only 灰度期放行
+          schema: {type: string}
+          description: API Key 白名单见 config/api_keys.yaml（不入 Git）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SalesPitchRequest'
+      responses:
+        '200':
+          description: 生成成功；同一 session_id 续传可进行多轮迭代
+          headers:
+            X-Trace-Id: {schema: {type: string}, description: 请求追踪 ID（uuid4 hex）}
+            X-Queue-Status: {schema: {type: string}, description: immediate | queued（排队发生时）}
+            X-Queue-Wait: {schema: {type: string}, description: 排队等待秒数}
+            X-Queue-Position: {schema: {type: string}, description: 入队时位置}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalesPitchResponse'
+        '400': {description: app_id required, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '401': {description: 鉴权失败（缺 Key / Key 无效 / app_id 白名单外 / Key 绑定不匹配）, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '403': {description: Key 无该接口权限, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '422': {description: 入参校验失败（字段级错误串）, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '429': {description: 限流 / 排队（QPM / 日量 / 队列满 / 排队超时）, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '500': {description: 未捕获异常兜底, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '503': {description: Agent 栈初始化失败或空输出（服务降级）, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /v1/audit/requests:
+    get:
+      summary: 请求审计列表（只读，运维接口，不鉴权）
+      tags: [audit]
+      parameters:
+        - {name: trace_id, in: query, schema: {type: string}}
+        - {name: app_id, in: query, schema: {type: string}}
+        - {name: session_id, in: query, schema: {type: string}}
+        - {name: request_kind, in: query, schema: {type: string, default: sales_pitch}}
+        - {name: status, in: query, schema: {type: string, enum: [ok, error]}}
+        - {name: ts_from, in: query, schema: {type: string}, description: ISO 时间下界（含）}
+        - {name: ts_to, in: query, schema: {type: string}, description: ISO 时间上界（含）}
+        - {name: size, in: query, schema: {type: integer, default: 50, maximum: 200}}
+        - {name: offset, in: query, schema: {type: integer, default: 0}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1}, description: 1 起；与 offset 二选一，page 优先}
+      responses:
+        '200':
+          description: 审计关闭或 MySQL 不可用时返回 {enabled:false,total:0,items:[]}（静默降级，不报错）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditListResponse'
+  /v1/audit/requests/{trace_id}:
+    get:
+      summary: 请求审计详情（完整文档）
+      tags: [audit]
+      parameters:
+        - {name: trace_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: 完整审计文档（含 input / result JSON 块；话术正文截前 600 字）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditDetail'
+        '404': {description: not found, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+        '503': {description: audit disabled（审计关闭）, content: {application/json: {schema: {$ref: '#/components/schemas/ErrorResponse'}}}}
+  /v1/users/me:
+    get:
+      summary: 当前用户（占位实现，未接鉴权，接入前勿对外依赖）
+      tags: [user]
+      responses:
+        '200':
+          description: 占位响应
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMeResponse'
+  /health:
+    get:
+      summary: 健康检查（Agent 栈初始化失败时仍返回 200 ok）
+      tags: [ops]
+      responses:
+        '200':
+          description: 服务存活
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    SalesPitchRequest:
+      type: object
+      required: [app_id, products]
+      properties:
+        app_id: {type: string, description: 调用方标识，须在 allowed_app_ids 白名单内且与 Key 绑定一致}
+        session_id: {type: string, description: 缺省由服务生成并随响应返回；同值续传即多轮对话}
+        customer:
+            $ref: '#/components/schemas/SalesPitchCustomerInfo'
+        products:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/SalesPitchProductInfo'
+        pitch_style: {type: string, description: warm | professional | concise 或自由描述（如"小红书种草风"）}
+        channel: {type: string, description: wechat | offline | phone | live 或自由描述}
+        max_length: {type: integer, minimum: 0, description: 话术字数上限（0 或缺省不限）}
+      description: 入参经 Pydantic 清理（HTML 标签剥除 + lone surrogate 剔除）
+    SalesPitchCustomerInfo:
+      type: object
+      description: 顾客画像，全部可选；未提供的维度不注入 prompt
+      properties:
+        nickname: {type: string, description: 顾客称呼，如"王女士"}
+        gender: {type: string}
+        age: {type: string, description: 年龄段或具体年龄，如"35""大学生"}
+        style_preference: {type: string, description: 如"简约通勤"}
+        scene: {type: string, description: 使用/穿着场景，如"秋季通勤"}
+        size_info: {type: string, description: 尺码/身材，如"M 码""173cm/60kg"}
+        budget: {type: string, description: 预算范围，如"500-800元"}
+        notes: {type: string, description: 导购补录的顾客关注点/历史消费备注}
+        extra: {type: object, additionalProperties: true, description: 扩展字段，以"字段名→值"原样注入 prompt}
+    SalesPitchProductInfo:
+      type: object
+      required: [title]
+      properties:
+        sku_id: {type: string}
+        title: {type: string, description: 商品名称（清理后须非空）}
+        price: {type: number}
+        category: {type: string, description: 如"卫衣""运动鞋"}
+        color: {type: string}
+        material: {type: string}
+        selling_points: {type: string, description: 卖点，逗号或分号分隔}
+        extra: {type: object, additionalProperties: true}
+    SalesPitchResponse:
+      type: object
+      properties:
+        session_id: {type: string, description: 本轮会话 ID（多轮续传用）}
+        pitch: {type: string, description: 话术正文（可直接发给顾客）}
+        pitch_style: {type: string}
+        model: {type: string, description: 实际生效的主模型名}
+        trace_id: {type: string, description: 与 X-Trace-Id 一致，可查审计}
+    ErrorResponse:
+      type: object
+      required: [code, message, trace_id]
+      properties:
+        code: {type: integer, description: HTTP 状态码（错误码字典见 error-codes.md）}
+        message: {type: string, description: ≤500 字}
+        trace_id: {type: string}
+    AuditListResponse:
+      type: object
+      properties:
+        enabled: {type: boolean}
+        total: {type: integer}
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditItem'
+    AuditItem:
+      type: object
+      description: 精简行（slim_audit_row），话术只含前 80 字
+      properties:
+        trace_id: {type: string}
+        session_id: {type: string}
+        app_id: {type: string}
+        request_kind: {type: string}
+        ts: {type: string}
+        created_at: {type: string}
+        elapsed_ms: {type: integer}
+        status: {type: string}
+        pitch_style: {type: string}
+        pitch: {type: string}
+        product_count: {type: integer}
+        has_customer: {type: boolean}
+        pitch_len: {type: integer}
+    AuditDetail:
+      type: object
+      properties:
+        trace_id: {type: string}
+        session_id: {type: string}
+        app_id: {type: string}
+        caller: {type: string, description: Key 绑定的调用方}
+        request_kind: {type: string}
+        ts: {type: string}
+        elapsed_ms: {type: integer}
+        status: {type: string}
+        error: {type: string, nullable: true}
+        input: {type: object, description: 入参快照（session_id/customer/products/pitch_style/channel/max_length）}
+        intent: {type: string, nullable: true, description: 历史字段，恒 null}
+        recall: {type: string, nullable: true, description: 历史字段，恒 null}
+        ranking: {type: string, nullable: true, description: 历史字段，恒 null}
+        result:
+          type: object
+          nullable: true
+          properties:
+            pitch: {type: string, nullable: true, description: 截前 600 字}
+            pitch_len: {type: integer}
+            error: {type: string, description: 失败时的错误串}
+    UserMeResponse:
+      type: object
+      properties:
+        user_id: {type: string}
+    HealthResponse:
+      type: object
+      properties:
+        status: {type: string, example: ok}
+        service: {type: string, example: sales_pitch}
