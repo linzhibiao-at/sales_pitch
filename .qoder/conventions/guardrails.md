@@ -20,11 +20,11 @@ fail=0
 # GR-01 语法编译
 .venv/bin/python -m compileall -q backend/ || { echo "❌ GR-01 compileall"; fail=1; }
 
-# GR-02 测试基线（≥94，全绿）
+# GR-02 测试基线（≥95，全绿）
 out=$(.venv/bin/python -m pytest tests/ -q 2>&1 | tail -3); echo "$out" | tail -1
 echo "$out" | grep -qE '[0-9]+ (failed|error)' && { echo "❌ GR-02 存在失败用例"; fail=1; }
 n=$(echo "$out" | tail -1 | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | head -1)
-if [ -z "$n" ] || [ "$n" -lt 94 ]; then echo "❌ GR-02 用例数 ${n:-0} < 基线 94"; fail=1; fi
+if [ -z "$n" ] || [ "$n" -lt 95 ]; then echo "❌ GR-02 用例数 ${n:-0} < 基线 95"; fail=1; fi
 
 # GR-03 输出禁令（print / traceback.print_exc）
 grep -rnE '(^|[^a-zA-Z_.])print\(' backend --include='*.py' && { echo "❌ GR-03 print()"; fail=1; }
@@ -94,7 +94,7 @@ missing=$(grep -rL '^from __future__ import annotations' backend --include='*.py
 | 编号 | 规则 | 依据 |
 |---|---|---|
 | GR-01 | `backend/` 全量语法编译通过 | AGENTS.md 硬性规则 |
-| GR-02 | pytest 全绿且用例数 ≥ 94 | AGENTS.md 规则 8 |
+| GR-02 | pytest 全绿且用例数 ≥ 95 | AGENTS.md 规则 8 |
 | GR-03 | 禁止 `print()` / `traceback.print_exc()` | AGENTS.md 规则 2 |
 | GR-04 | `backend/` 单文件 ≤ 300 行 | AGENTS.md 规则 3 |
 | GR-05 | 模块级 import 分层单向 | AGENTS.md 规则 1 |
@@ -129,7 +129,7 @@ AST 解析 `def` / `async def`，统计 `lineno`~`end_lineno` 内**非 docstring
 | 登记项 | 当前值 | 门禁上限 | 处置计划 |
 |---|---|---|---|
 | `backend/services/sales_pitch_service.py::generate` | 60 有效行 | 50 | 拆分 prompt 构建/结果提取为独立函数（plans/backlog.md 架构治理） |
-| pytest 用例基线 | 94 | 只增不减 | — |
+| pytest 用例基线 | 95 | 只增不减 | — |
 
 ## 建议级检查（advisory，不拦截）
 

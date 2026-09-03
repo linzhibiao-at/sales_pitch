@@ -379,6 +379,43 @@ class MysqlClientAvailabilityTest(unittest.TestCase):
         self.assertTrue(client.available)
 
 
+class MysqlReconnectDeadlockTest(unittest.TestCase):
+    """持锁操作触达重连路径（_ensure_conn→_connect→_create_table）不得死锁。
+
+    历史缺陷：_create_table 内部拿 self._lock，而 insert/query/count 已持
+    锁调用 _ensure_conn——非重入 Lock 下同线程二次拿锁永久阻塞。
+    """
+
+    def test_insert_reconnect_path_no_deadlock(self) -> None:
+        from unittest.mock import patch
+
+        with patch(
+            "backend.infra.mysql.get_mysql_url",
+            return_value="mysql+pymysql://u:p@h/db",
+        ), patch(
+            "backend.infra.mysql.get_mysql_table",
+            return_value="request_audit",
+        ), patch("backend.infra.mysql.pymysql") as fake:
+            cur = fake.connect.return_value.cursor.return_value.__enter__.return_value
+            cur.rowcount = 1
+            client = MysqlClient()  # 真实 __init__：锁类型来自生产代码
+            client._conn = None  # 模拟断连 / 首连失败后的重试状态
+
+            result: dict = {}
+
+            def run() -> None:
+                result["n"] = client.insert_audit_many([{"trace_id": "t1"}])
+
+            t = threading.Thread(target=run, daemon=True)
+            t.start()
+            t.join(5)
+            self.assertFalse(
+                t.is_alive(),
+                "insert_audit_many 死锁：持锁重连路径重入 _create_table 二次拿锁",
+            )
+            self.assertEqual(result.get("n"), 1)
+
+
 # ── 后台批量写线程测试 ──────────────────────────────────────────────
 
 class _BlockingClient:

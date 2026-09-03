@@ -87,7 +87,9 @@ class MysqlClient:
         self._conn: Any = None
         self._params: dict[str, Any] | None = None
         self._table: str = ""
-        self._lock = threading.Lock()
+        # RLock（可重入）：持锁操作 → _ensure_conn → _connect → _create_table
+        # 同线程重入拿锁，非重入 Lock 会在此路径死锁
+        self._lock = threading.RLock()
         url = get_mysql_url()
         if not url:
             return
@@ -183,7 +185,7 @@ class MysqlClient:
                 with self._conn.cursor() as cur:
                     cur.execute(
                         f"""SELECT id, trace_id, session_id, app_id, caller,
-                                   request_kind, ts AS created_at, elapsed_ms, status, error,
+                                   request_kind, ts, created_at, elapsed_ms, status, error,
                                    input_json, result_json,
                                    intent_json, recall_json, ranking_json
                             FROM {self._table}
