@@ -9,7 +9,7 @@ owner: @linzhibiao
 ## 基本要求
 
 - 新增代码必须有对应 pytest 测试，与实现同批提交。
-- 提交前 `tests/` 全绿，**88 用例基线只增不减**（guardrails GR-02 机械检查）。
+- 提交前 `tests/` 全绿，**94 用例基线只增不减**（guardrails GR-02 机械检查）。
 - 测试**不依赖任何外部资源**（Redis / MySQL / LLM / 网络），离线可跑。
 
 运行命令（仓库根目录）：

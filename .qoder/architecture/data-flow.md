@@ -25,7 +25,7 @@ Client
              │     ├── LLM 双通道：DashScope 主 → 安踏网关 fallback
              │     └── FilesystemPermission：deny 写 /skills/** /memory/** /soul/**
              ├── 反向遍历 messages，提取最后一条非空 AI 消息作为话术
-             └── finally: _write_audit() → MySQL request_audit 表（静默降级）
+             └── finally: _write_audit() → 入队（后台线程批量写 MySQL，静默降级）
   -> 响应 {session_id, pitch, pitch_style, model, trace_id}
        + X-Trace-Id / X-Queue-Status / X-Queue-Wait / X-Queue-Position 头
 ```
@@ -36,11 +36,14 @@ Client
 - 后续请求：携带同一 `session_id` → LangGraph 恢复该 thread 的对话历史 → Agent 在上下文中迭代话术。
 - 历史超过 5 万 token 时由 SummarizationMiddleware 压缩，保留最近 10 条。
 
-## 审计写入（services/request_audit.py）
+## 审计写入（services/request_audit.py + services/audit_worker.py）
 
 - 触发点：`SalesPitchService.generate()` 的 `finally` 块——成功与失败路径都落审计。
+- 异步批量：`write()` 仅入内存队列（微秒级，不阻塞事件循环）；后台 daemon 线程 drain 队列攒批（≤50 条/批），经 `insert_audit_many`（executemany）批量落库。
 - 文档构造：`build_sales_pitch_doc(input_block, result, meta)` 纯函数；话术正文只落前 600 字 + 总长度（`pitch_len`），避免文档膨胀。
-- 失败静默：`RequestAuditLogger.write()` 内 `except Exception: logger.warning(exc_info=True)`，不影响主链路。
+- 断连自愈：`MysqlClient._ensure_conn` ping 保活 / 重连（含重试一次），MySQL 恢复后审计自动续写。
+- 失败静默：队列满丢弃新文档并计数；批量写失败丢弃该批；均只 warning，不影响主链路（宁丢不阻塞）。
+- 退出兑底：atexit 时尽力 drain 剩余队列；`stats()` 可观测 queued/written/dropped/failed_batches。
 
 ## 审计查询（GET /v1/audit/requests）
 

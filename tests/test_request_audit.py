@@ -1,13 +1,15 @@
-"""请求审计单测（config 开关 + MySQL 客户端降级 + sales_pitch 审计文档构造）。"""
+"""请求审计单测（config 开关 + MySQL 客户端降级 + 后台批量写 + 审计文档构造）。"""
 
 from __future__ import annotations
 
 import json
+import threading
 import unittest
 from unittest.mock import MagicMock
 
 from backend.config import get_mysql_table, get_mysql_url, get_request_audit_enabled
 from backend.infra.mysql import MysqlClient, _parse_url, _to_json, _from_json, _row_to_doc
+from backend.services.audit_worker import AuditBatchWorker
 from backend.services.request_audit import (
     RequestAuditLogger,
     build_audit_query,
@@ -245,17 +247,17 @@ class _MockMysqlClient:
     def __init__(self) -> None:
         self._available = True
         self.docs: list[dict] = []
-        self.insert_calls: list[dict] = []
+        self.batch_calls: list[list[dict]] = []
         self.query_calls: list[tuple] = []
 
     @property
     def available(self) -> bool:
         return self._available
 
-    def insert_audit(self, doc: dict) -> int:
-        self.insert_calls.append(doc)
-        self.docs.append(doc)
-        return len(self.docs)
+    def insert_audit_many(self, docs: list[dict]) -> int:
+        self.batch_calls.append(list(docs))
+        self.docs.extend(docs)
+        return len(docs)
 
     def query_audit(
         self, where: str, params: tuple | list,
@@ -276,10 +278,11 @@ class _MockMysqlClient:
 
 
 def _make_logger(client, enabled: bool = True):
-    """绕过 MysqlClient.__init__ 的 MySQL 连接，直接注入可测实例。"""
+    """绕过 MysqlClient.__init__ 的 MySQL 连接，直接注入可测实例（纯查询用途）。"""
     log = RequestAuditLogger.__new__(RequestAuditLogger)
     log._client = client
     log._enabled = enabled
+    log._worker = None
     return log
 
 
@@ -288,24 +291,46 @@ class RequestAuditLoggerTest(unittest.TestCase):
         mock = _MockMysqlClient()
         log = _make_logger(mock, enabled=False)
         log.write({"a": 1})
-        self.assertEqual(mock.insert_calls, [])
+        self.assertEqual(mock.batch_calls, [])
 
-    def test_write_success(self) -> None:
+    def test_write_queued_and_batch_written(self) -> None:
+        """write 仅入队；flush 后后台线程已批量写入。"""
         mock = _MockMysqlClient()
-        log = _make_logger(mock, enabled=True)
-        log.write({"trace_id": "t1", "app_id": "app"})
-        self.assertEqual(len(mock.insert_calls), 1)
-        self.assertEqual(mock.insert_calls[0]["trace_id"], "t1")
+        worker = AuditBatchWorker(mock)
+        log = RequestAuditLogger(client=mock, enabled=True, worker=worker)
+        try:
+            log.write({"trace_id": "t1", "app_id": "app"})
+            log.write({"trace_id": "t2", "app_id": "app"})
+            self.assertTrue(log.flush())
+        finally:
+            worker.close()
+        self.assertEqual(len(mock.docs), 2)
+        self.assertEqual(mock.docs[0]["trace_id"], "t1")
+        self.assertGreaterEqual(len(mock.batch_calls), 1)
 
-    def test_write_swallows_exception(self) -> None:
+    def test_write_batch_failure_swallowed(self) -> None:
         class _Boom:
             available = True
 
-            def insert_audit(self, doc):
+            def insert_audit_many(self, docs):
                 raise RuntimeError("boom")
 
         log = RequestAuditLogger(client=_Boom(), enabled=True)
-        log.write({"a": 1})  # 不 raise
+        try:
+            log.write({"a": 1})
+            self.assertTrue(log.flush())  # 不抛
+            self.assertEqual(log._worker.stats()["failed_batches"], 1)
+        finally:
+            log.close()
+
+    def test_query_only_instance_no_worker(self) -> None:
+        """start_worker=False：纯查询实例，write 静默、不起线程。"""
+        mock = _MockMysqlClient()
+        log = RequestAuditLogger(client=mock, enabled=True, start_worker=False)
+        self.assertIsNone(log._worker)
+        log.write({"a": 1})
+        self.assertEqual(mock.batch_calls, [])
+        self.assertTrue(log.flush())
 
     def test_search_and_count(self) -> None:
         mock = _MockMysqlClient()
@@ -340,6 +365,7 @@ class MysqlClientAvailabilityTest(unittest.TestCase):
         # 绕过实际 MySQL 连接，直接测试 available 属性
         client = MysqlClient.__new__(MysqlClient)
         client._conn = None
+        client._params = None
         client._table = ""
         client._lock = __import__("threading").Lock()
         self.assertFalse(client.available)
@@ -347,9 +373,95 @@ class MysqlClientAvailabilityTest(unittest.TestCase):
     def test_available_when_connected(self) -> None:
         client = MysqlClient.__new__(MysqlClient)
         client._conn = MagicMock()
+        client._params = None
         client._table = "test"
         client._lock = __import__("threading").Lock()
         self.assertTrue(client.available)
+
+
+# ── 后台批量写线程测试 ──────────────────────────────────────────────
+
+class _BlockingClient:
+    """首次 insert 阻塞直到 release，用于确定性控制后台线程节奏。"""
+
+    available = True
+
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+        self.batches: list[int] = []
+
+    def insert_audit_many(self, docs: list[dict]) -> int:
+        self.started.set()
+        self.release.wait(timeout=5)
+        self.batches.append(len(docs))
+        return len(docs)
+
+
+class AuditBatchWorkerTest(unittest.TestCase):
+    def test_flush_empty_returns_true(self) -> None:
+        w = AuditBatchWorker(_MockMysqlClient())
+        try:
+            self.assertTrue(w.flush(timeout=1.0))
+            self.assertEqual(w.stats(), {"queued": 0, "written": 0, "dropped": 0, "failed_batches": 0})
+        finally:
+            w.close()
+
+    def test_close_drains_pending(self) -> None:
+        """close 停线程前 drain 剩余队列，未处理文档不丢。"""
+        mock = _MockMysqlClient()
+        w = AuditBatchWorker(mock, poll_interval=60)  # 长轮询：线程暂不取
+        for i in range(3):
+            w.submit({"trace_id": f"t{i}"})
+        w.close()
+        self.assertEqual(len(mock.docs), 3)
+
+    def test_queue_full_drops_new_doc(self) -> None:
+        """队列满时 submit 丢弃新文档并计数，不抛异常。"""
+        bc = _BlockingClient()
+        w = AuditBatchWorker(bc, max_queue=2, poll_interval=0.01)
+        try:
+            self.assertTrue(w.submit({"trace_id": "d1"}))
+            self.assertTrue(bc.started.wait(timeout=2))  # 线程已取走 d1 并阻塞
+            self.assertTrue(w.submit({"trace_id": "d2"}))
+            self.assertTrue(w.submit({"trace_id": "d3"}))  # 队列 2/2 满
+            self.assertFalse(w.submit({"trace_id": "d4"}))  # 丢弃
+            bc.release.set()
+            self.assertTrue(w.flush())
+        finally:
+            w.close()
+        stats = w.stats()
+        self.assertEqual(stats["dropped"], 1)
+        self.assertEqual(stats["written"], 3)  # d1 d2 d3
+
+    def test_batch_size_respected(self) -> None:
+        """每批不超过 batch_size，总量不丢。"""
+        mock = _MockMysqlClient()
+        w = AuditBatchWorker(mock, batch_size=2, poll_interval=0.01)
+        try:
+            for i in range(5):
+                w.submit({"trace_id": f"t{i}"})
+            self.assertTrue(w.flush())
+        finally:
+            w.close()
+        self.assertEqual(len(mock.docs), 5)
+        self.assertTrue(all(len(b) <= 2 for b in mock.batch_calls))
+
+    def test_write_batch_exception_counted_not_raised(self) -> None:
+        class _Boom:
+            available = True
+
+            def insert_audit_many(self, docs):
+                raise RuntimeError("boom")
+
+        w = AuditBatchWorker(_Boom())
+        try:
+            w.submit({"a": 1})
+            self.assertTrue(w.flush())
+        finally:
+            w.close()
+        self.assertEqual(w.stats()["failed_batches"], 1)
+        self.assertEqual(w.stats()["written"], 0)
 
 
 if __name__ == "__main__":

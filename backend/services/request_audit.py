@@ -1,6 +1,8 @@
-"""对外请求审计落库到 MySQL（request_audit 表）。
+"""对外请求审计：写经内存队列后台批量落库 MySQL（request_audit 表）。
 
 纯函数 build_*_doc 便于单测；RequestAuditLogger 负责写/查，失败静默降级。
+写路径不入业务线程：``write()`` 仅入队，由 ``audit_worker`` 后台线程
+批量写，MySQL 慢/断连不阻塞话术主链路。
 """
 
 from __future__ import annotations
@@ -115,12 +117,17 @@ def slim_audit_row(src: dict[str, Any]) -> dict[str, Any]:
 
 
 class RequestAuditLogger:
-    """对外请求审计 MySQL 写/查；不可用或关闭时静默降级。"""
+    """对外请求审计 MySQL 写/查；写经内存队列后台批量，失败静默降级。
+
+    ``start_worker=False`` 用于纯查询实例（如审计路由），不起写线程。
+    """
 
     def __init__(
         self,
         client: Any = None,
         enabled: Optional[bool] = None,
+        worker: Any = None,
+        start_worker: bool = True,
     ) -> None:
         self._enabled = (
             get_request_audit_enabled() if enabled is None else bool(enabled)
@@ -133,6 +140,19 @@ class RequestAuditLogger:
         else:
             # 审计关闭时不建连接，避免无谓的 MySQL 握手
             self._client = None
+        if worker is not None:
+            self._worker = worker
+        elif (
+            self._enabled and start_worker
+            and self._client is not None
+            and getattr(self._client, "available", True)
+        ):
+            # available=False（url 为空/连接失败）时不起空转线程；
+            # 入队前提 enabled 同样依赖 available，两者口径一致
+            from backend.services.audit_worker import AuditBatchWorker
+            self._worker = AuditBatchWorker(self._client)
+        else:
+            self._worker = None
 
     @property
     def enabled(self) -> bool:
@@ -141,13 +161,24 @@ class RequestAuditLogger:
         )
 
     def write(self, doc: dict[str, Any]) -> None:
-        """写一条审计文档；关闭/不可用/失败均静默。"""
-        if not self._enabled:
+        """审计文档入队（后台线程批量写 MySQL）；关闭/队列满均静默。"""
+        if not self._enabled or self._worker is None:
             return
         try:
-            self._client.insert_audit(doc)
+            self._worker.submit(doc)
         except Exception:  # noqa: BLE001
-            logger.warning("request audit write failed", exc_info=True)
+            logger.warning("request audit submit failed", exc_info=True)
+
+    def flush(self, timeout: float = 10.0) -> bool:
+        """等待队列中审计全部落库（测试/运维用）。"""
+        if self._worker is None:
+            return True
+        return self._worker.flush(timeout)
+
+    def close(self, timeout: float = 10.0) -> None:
+        """停止后台写线程并尽力 drain 剩余队列（进程退出由 atexit 兜底）。"""
+        if self._worker is not None:
+            self._worker.close(timeout)
 
     def search(
         self,

@@ -15,7 +15,7 @@ from backend.services.request_audit import (
 router = APIRouter()
 
 # 独立审计实例（不依赖 Agent 服务是否可用）
-_audit = RequestAuditLogger()
+_audit = RequestAuditLogger(start_worker=False)  # 纯查询实例，不起后台写线程
 
 
 @router.get("/requests")

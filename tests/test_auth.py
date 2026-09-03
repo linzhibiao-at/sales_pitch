@@ -54,7 +54,7 @@ class TestRouteToApiName(unittest.TestCase):
         """仅话术生成接口鉴权；运维/健康接口不拦。"""
         from backend.auth import _is_protected
         self.assertTrue(_is_protected("/v1/sales-pitch/generate"))
-        # 运维/调试接口不鉴权（由网络层 ACL 兑底）
+        # 运维/调试接口不鉴权（由网络层 ACL 兜底）
         self.assertFalse(_is_protected("/health"))
         self.assertFalse(_is_protected("/api/audit/requests"))
         self.assertFalse(_is_protected("/docs"))

@@ -10,12 +10,16 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import threading
 from typing import Any
 from urllib.parse import urlparse
 
 from backend.config import get_mysql_table, get_mysql_url
+
+try:
+    import pymysql
+except ImportError:  # pragma: no cover - requirements 已固定，防御性兜底
+    pymysql = None
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +50,15 @@ CREATE TABLE IF NOT EXISTS {table} (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
 
+# 审计写入 SQL（executemany 批量时 pymysql 自动重写为多值插入）
+_INSERT_AUDIT_SQL = """\
+INSERT INTO {table}
+    (trace_id, session_id, app_id, caller, request_kind,
+     ts, elapsed_ms, status, error,
+     input_json, intent_json, recall_json, ranking_json, result_json)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+"""
+
 
 def _parse_url(url: str) -> dict[str, Any]:
     """从 ``mysql+pymysql://...`` 连接串中解析连接参数。"""
@@ -68,29 +81,36 @@ def _parse_url(url: str) -> dict[str, Any]:
 
 
 class MysqlClient:
-    """pymysql 客户端，自动建表 + 单连接（线程安全锁保护）。"""
+    """pymysql 客户端：自动建表 + 单连接（锁保护）+ 断连自动重连。"""
 
     def __init__(self) -> None:
         self._conn: Any = None
+        self._params: dict[str, Any] | None = None
         self._table: str = ""
         self._lock = threading.Lock()
         url = get_mysql_url()
         if not url:
             return
-        try:
-            import pymysql
+        if pymysql is None:
+            logger.warning("[infra] pymysql 未安装，MySQL 审计不可用")
+            return
+        self._params = _parse_url(url)
+        self._table = get_mysql_table()
+        self._connect()
 
-            params = _parse_url(url)
+    def _connect(self) -> None:
+        """按已存参数建立连接并自动建表；失败静默降级。"""
+        if not self._params or pymysql is None:
+            return
+        try:
             self._conn = pymysql.connect(
-                **params,
+                **self._params,
                 cursorclass=pymysql.cursors.DictCursor,
                 autocommit=True,
                 connect_timeout=5,
                 read_timeout=10,
                 write_timeout=10,
             )
-            self._table = get_mysql_table()
-            # 启动时自动建表
             self._create_table()
         except Exception as e:  # noqa: BLE001
             logger.warning("[infra] MySQL init failed: %s", e)
@@ -98,6 +118,18 @@ class MysqlClient:
 
     @property
     def available(self) -> bool:
+        return self._conn is not None
+
+    def _ensure_conn(self) -> bool:
+        """确保连接可用：ping 保活 / 断连重连（含首次失败后的延迟重试）。"""
+        if self._conn is not None:
+            try:
+                self._conn.ping(reconnect=True)
+                return True
+            except Exception:  # noqa: BLE001
+                self._conn = None
+        if self._params is not None:
+            self._connect()
         return self._conn is not None
 
     def _create_table(self) -> None:
@@ -108,40 +140,32 @@ class MysqlClient:
         logger.info("[infra] MySQL 审计表 '%s' 就绪", self._table)
 
     # ── 写 ─────────────────────────────────────────────────────────────
-    def insert_audit(self, doc: dict[str, Any]) -> int | None:
-        """写入审计文档，返回自增 ID；失败/不可用返回 None。"""
-        if not self._conn:
-            return None
+    def insert_audit_many(self, docs: list[dict[str, Any]]) -> int:
+        """批量写入审计文档（executemany），返回成功写入条数。
+
+        断连时重连后重试一次；仍失败则本批丢弃（返回 0），由调用方
+        （后台批量写线程）决定后续策略。
+        """
+        if not docs:
+            return 0
+        rows = [_doc_row(d) for d in docs]
+        sql = _INSERT_AUDIT_SQL.format(table=self._table)
         with self._lock:
-            try:
-                with self._conn.cursor() as cur:
-                    cur.execute(
-                        f"""INSERT INTO {self._table}
-                            (trace_id, session_id, app_id, caller, request_kind,
-                             ts, elapsed_ms, status, error,
-                             input_json, intent_json, recall_json, ranking_json, result_json)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                        (
-                            doc.get("trace_id"),
-                            doc.get("session_id"),
-                            doc.get("app_id"),
-                            doc.get("caller"),
-                            doc.get("request_kind"),
-                            doc.get("ts"),
-                            doc.get("elapsed_ms"),
-                            doc.get("status"),
-                            doc.get("error"),
-                            _to_json(doc.get("input")),
-                            _to_json(doc.get("intent")),
-                            _to_json(doc.get("recall")),
-                            _to_json(doc.get("ranking")),
-                            _to_json(doc.get("result")),
-                        ),
+            if not self._ensure_conn():
+                return 0
+            for attempt in (1, 2):
+                try:
+                    with self._conn.cursor() as cur:
+                        cur.executemany(sql, rows)
+                        return int(cur.rowcount or 0)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(
+                        "[infra] MySQL insert_audit_many failed (attempt %d): %s",
+                        attempt, e,
                     )
-                    return int(cur.lastrowid or 0)
-            except Exception as e:  # noqa: BLE001
-                logger.warning("[infra] MySQL insert_audit failed: %s", e)
-                return None
+                    if attempt == 2 or not self._ensure_conn():
+                        return 0
+        return 0
 
     # ── 查 ─────────────────────────────────────────────────────────────
     def query_audit(
@@ -152,9 +176,9 @@ class MysqlClient:
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         """按条件查询审计记录（分页，ts 倒序）。"""
-        if not self._conn:
-            return []
         with self._lock:
+            if not self._ensure_conn():
+                return []
             try:
                 with self._conn.cursor() as cur:
                     cur.execute(
@@ -175,9 +199,9 @@ class MysqlClient:
 
     def count_audit(self, where: str, params: tuple | list) -> int:
         """按条件统计总数。"""
-        if not self._conn:
-            return 0
         with self._lock:
+            if not self._ensure_conn():
+                return 0
             try:
                 with self._conn.cursor() as cur:
                     cur.execute(f"SELECT COUNT(*) AS cnt FROM {self._table} {where}", params)
@@ -195,6 +219,18 @@ class MysqlClient:
 
 
 # ── 辅助函数 ────────────────────────────────────────────────────────────
+
+def _doc_row(doc: dict[str, Any]) -> tuple:
+    """审计文档 → INSERT 参数行。"""
+    return (
+        doc.get("trace_id"), doc.get("session_id"), doc.get("app_id"),
+        doc.get("caller"), doc.get("request_kind"),
+        doc.get("ts"), doc.get("elapsed_ms"), doc.get("status"), doc.get("error"),
+        _to_json(doc.get("input")), _to_json(doc.get("intent")),
+        _to_json(doc.get("recall")), _to_json(doc.get("ranking")),
+        _to_json(doc.get("result")),
+    )
+
 
 def _to_json(v: Any) -> str | None:
     """将 Python 对象序列化为 JSON 字符串存入 TEXT 列。"""
