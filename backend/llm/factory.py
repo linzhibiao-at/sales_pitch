@@ -11,9 +11,21 @@ import logging
 import os
 from typing import Any
 
-from backend.config import env_or_empty, load_config
+from backend.config import load_config
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_api_key(value: str) -> str:
+    """解析 api_key_env 配置值：直接 Key 或环境变量名。
+
+    - 以 ``sk-`` / ``ak-`` 开头 → 视为直接 API Key
+    - 否则视为环境变量名，从 ``os.environ`` 读取
+    """
+    v = (value or "").strip()
+    if v.startswith(("sk-", "ak-", "AK-", "SK-")):
+        return v
+    return os.environ.get(v, "") if v else ""
 
 
 def _build_chat_openai(
@@ -66,7 +78,7 @@ def create_sales_pitch_llm() -> Any:
     primary_cfg = mcfg.get("primary") or {}
     fallback_cfg = mcfg.get("fallback") or {}
 
-    primary_key = env_or_empty(str(primary_cfg.get("api_key_env") or "DASHSCOPE_API_KEY"))
+    primary_key = _resolve_api_key(str(primary_cfg.get("api_key_env") or "DASHSCOPE_API_KEY"))
     primary = _build_chat_openai(
         model=str(primary_cfg.get("model") or "qwen-plus"),
         api_key=primary_key,
@@ -78,7 +90,7 @@ def create_sales_pitch_llm() -> Any:
     )
 
     # fallback 模型仅创建不包装（DeepAgent 不接受 RunnableWithFallbacks）
-    fb_key = env_or_empty(str(fallback_cfg.get("api_key_env") or "ANTA_LLM_API_KEY"))
+    fb_key = _resolve_api_key(str(fallback_cfg.get("api_key_env") or "ANTA_LLM_API_KEY"))
     _fb = _build_chat_openai(
         model=str(fallback_cfg.get("model") or "qwen3.5-flash"),
         api_key=fb_key,
@@ -113,7 +125,7 @@ def create_summarization_llm() -> Any:
     primary_cfg = mcfg.get("primary") or {}
 
     # 复用主通道的 API Key 和 base_url
-    api_key = env_or_empty(str(primary_cfg.get("api_key_env") or "DASHSCOPE_API_KEY"))
+    api_key = _resolve_api_key(str(primary_cfg.get("api_key_env") or "DASHSCOPE_API_KEY"))
     base_url = str(
         primary_cfg.get("base_url")
         or "https://dashscope.aliyuncs.com/compatible-mode/v1"

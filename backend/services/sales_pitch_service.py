@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from time import perf_counter
 from typing import Any
 
@@ -151,7 +150,8 @@ class SalesPitchService:
     ) -> dict[str, Any]:
         """生成话术；Agent 空输出时返回 ``{"error": ...}``（路由层转 5xx）。"""
         t0 = perf_counter()
-        session_id = (req.session_id or "").strip() or uuid.uuid4().hex
+        # session_id = {guide_num}_{union_id}：同导购同会员共享会话上下文
+        session_id = f"{req.guide_num}_{req.customer.union_id}"
         status = "ok"
         error: str | None = None
         result: dict[str, Any] | None = None
@@ -229,6 +229,8 @@ class SalesPitchService:
         try:
             input_block = {
                 "session_id": session_id,
+                # 导购工号（导购身份标识）
+                "guide_num": req.guide_num,
                 "customer": (
                     req.customer.model_dump(exclude_none=True)
                     if req.customer is not None else None

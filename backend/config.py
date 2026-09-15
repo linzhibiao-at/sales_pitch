@@ -152,6 +152,34 @@ def load_api_keys(cfg: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
     return keys
 
 
+# ---------- guide auth (导购身份校验, mock 用户数据源) ----------
+def get_guide_auth_config(cfg: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """读取 ``config.yaml`` 的 ``guide_auth`` 段（mock 用户数据源, 暂代 user 表）。
+
+    返回归一化后的 dict: ``{enabled, users: [{guide_num, ...}]}``。键缺失时
+    enabled 默认 False（向后兼容, 不做导购校验）；``guide_num`` 剥空白,
+    空白/缺失/非 dict 条目丢弃, 其余字段原样保留（为未来 user 表字段留形状）。
+    """
+    data = cfg if cfg is not None else load_config()
+    g = data.get("guide_auth") or {}
+    if not isinstance(g, dict):
+        g = {}
+    raw_users = g.get("users") or []
+    users: list[dict[str, Any]] = []
+    if isinstance(raw_users, list):
+        for u in raw_users:
+            if not isinstance(u, dict):
+                continue
+            gid = str(u.get("guide_num") or "").strip()
+            if not gid:
+                continue
+            users.append({**u, "guide_num": gid})
+    return {
+        "enabled": bool(g.get("enabled", False)),
+        "users": users,
+    }
+
+
 # ---------- Redis（DeepAgent 记忆 / checkpointer） ----------
 def get_redis_host(cfg: Optional[dict[str, Any]] = None) -> str:
     """Redis 主机：优先环境变量 ``REDIS_HOST``，否则 ``config.yaml`` 的 ``redis.host``。"""

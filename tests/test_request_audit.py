@@ -64,8 +64,8 @@ class RequestAuditEnabledTest(unittest.TestCase):
 
 class ParseMysqlUrlTest(unittest.TestCase):
     def test_basic(self) -> None:
-        params = _parse_url("mysql+pymysql://user:pass@host:3306/mydb?charset=utf8mb4")
-        self.assertEqual(params["host"], "host")
+        params = _parse_url("mysql+pymysql://user:pass@localhost:3306/mydb?charset=utf8mb4")
+        self.assertEqual(params["host"], "localhost")
         self.assertEqual(params["port"], 3306)
         self.assertEqual(params["user"], "user")
         self.assertEqual(params["password"], "pass")

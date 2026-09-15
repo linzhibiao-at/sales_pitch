@@ -2,10 +2,9 @@
   <div class="generate-page">
     <div class="page-header">
       <h1 class="page-title">话术生成</h1>
-      <div class="session-bar">
+      <div class="session-bar" v-if="lastSessionId">
         <span class="session-label">会话 ID：</span>
-        <span class="session-id">{{ currentSessionId || '新会话' }}</span>
-        <button class="btn btn-secondary btn-sm" @click="newSession">新建会话</button>
+        <span class="session-id">{{ lastSessionId }}</span>
       </div>
     </div>
 
@@ -17,9 +16,17 @@
           <div class="section-header">
             <span class="section-icon">👤</span>
             <h2>顾客信息</h2>
-            <span class="hint">（选填）</span>
+            <span class="hint">（union_id 必填，其余选填）</span>
           </div>
           <div class="form-grid-2">
+            <div class="form-group">
+              <label>会员标识 (union_id) <span class="required">*</span></label>
+              <input v-model="form.customer.union_id" class="form-input" placeholder="如：微信 unionid" />
+            </div>
+            <div class="form-group">
+              <label>导购工号 (guide_num) <span class="required">*</span></label>
+              <input v-model="form.guide_num" class="form-input" placeholder="如：G001" />
+            </div>
             <div class="form-group">
               <label>称呼</label>
               <input v-model="form.customer.nickname" class="form-input" placeholder="如：王女士" />
@@ -152,7 +159,7 @@
             <span v-if="loading" class="spinner" />
             <span>{{ loading ? '生成中…' : '生成话术' }}</span>
           </button>
-          <span v-if="!canSubmit && !loading" class="hint-tip">请至少填写一个商品名称</span>
+          <span v-if="!canSubmit && !loading" class="hint-tip">请填写导购工号、会员标识和至少一个商品名称</span>
         </div>
       </div>
 
@@ -217,8 +224,9 @@ const defaultProduct = () => ({
 })
 
 const form = ref({
+  guide_num: localStorage.getItem('sp_guide_num') || '',
   customer: {
-    nickname: '', gender: '', age: '', size_info: '',
+    union_id: '', nickname: '', gender: '', age: '', size_info: '',
     style_preference: '', scene: '', budget: '', notes: '',
   },
   products: [defaultProduct()],
@@ -228,7 +236,9 @@ const form = ref({
 })
 
 const canSubmit = computed(() =>
-  form.value.products.some(p => p.title.trim())
+  form.value.products.some(p => p.title.trim()) &&
+  form.value.guide_num.trim() !== '' &&
+  form.value.customer.union_id.trim() !== ''
 )
 
 function addProduct() {
@@ -238,14 +248,8 @@ function removeProduct(idx) {
   form.value.products.splice(idx, 1)
 }
 
-// ── 会话管理 ──────────────────────────────────────────────
-const currentSessionId = ref(localStorage.getItem('sp_session_id') || '')
-
-function newSession() {
-  currentSessionId.value = ''
-  localStorage.removeItem('sp_session_id')
-  history.value = []
-}
+// ── 会话状态 ──────────────────────────────────────────────
+const lastSessionId = ref('')
 
 // ── 对话历史 ──────────────────────────────────────────────
 const history = ref([])
@@ -258,9 +262,13 @@ async function doGenerate() {
 
   // 清理空字段，构造请求体
   const appId = localStorage.getItem('sp_app_id') || 'micro_guide'
-  const customer = Object.fromEntries(
+  const customerRaw = Object.fromEntries(
     Object.entries(form.value.customer).filter(([, v]) => v !== '' && v !== null)
   )
+  // union_id 必传，确保始终包含
+  customerRaw.union_id = form.value.customer.union_id.trim()
+  // 保存 guide_num 到 localStorage 方便下次使用
+  localStorage.setItem('sp_guide_num', form.value.guide_num.trim())
   const products = form.value.products
     .filter(p => p.title.trim())
     .map(p => {
@@ -276,12 +284,12 @@ async function doGenerate() {
 
   const payload = {
     app_id: appId,
+    guide_num: form.value.guide_num.trim(),
     products,
-    ...(Object.keys(customer).length > 0 && { customer }),
+    customer: customerRaw,
     ...(form.value.pitch_style && { pitch_style: form.value.pitch_style }),
     ...(form.value.channel && { channel: form.value.channel }),
     ...(form.value.max_length > 0 && { max_length: form.value.max_length }),
-    ...(currentSessionId.value && { session_id: currentSessionId.value }),
   }
 
   // 添加 loading 占位条目
@@ -299,10 +307,9 @@ async function doGenerate() {
     entry.loading = false
     entry.pitch = res.pitch
     entry.traceId = res.trace_id
-    // 保存 session_id 供多轮复用
+    // 保存 session_id 用于展示（系统确定性生成，不存 localStorage）
     if (res.session_id) {
-      currentSessionId.value = res.session_id
-      localStorage.setItem('sp_session_id', res.session_id)
+      lastSessionId.value = res.session_id
     }
   } catch (e) {
     entry.loading = false

@@ -39,8 +39,10 @@ def _strip_html_tags(v: object) -> object:
 
 # ── 对外营销话术接口（/v1/sales-pitch/generate）──
 class SalesPitchCustomerInfo(BaseModel):
-    """顾客画像（全部可选，按需传入；未提供的维度不注入 prompt）。"""
+    """顾客画像：union_id 必传（用于 session_id 生成），其余按需传入。"""
 
+    # 会员标识（必传）：微信 unionid 等平台标识，用于确定性生成 session_id
+    union_id: str = Field(min_length=1)
     # 顾客称呼（如"王女士""李先生"），话术可直接用来拉近距离
     nickname: Optional[str] = None
     gender: Optional[str] = None
@@ -58,6 +60,11 @@ class SalesPitchCustomerInfo(BaseModel):
     notes: Optional[str] = None
     # 扩展字段：以"字段名→值"形式原样注入 prompt
     extra: Dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("union_id", mode="after")
+    @classmethod
+    def _strip_union_id(cls, v: str) -> str:
+        return v.strip()
 
     @field_validator("nickname", "age", "style_preference", "scene",
                      "size_info", "budget", "notes", mode="after")
@@ -120,10 +127,11 @@ class SalesPitchProductInfo(BaseModel):
 class SalesPitchRequest(BaseModel):
     """营销话术生成入参：顾客信息 + 商品信息 → LLM 生成导购话术。"""
 
-    session_id: Optional[str] = None
     app_id: str
-    # 顾客信息整体可选：缺省时生成通用话术
-    customer: Optional[SalesPitchCustomerInfo] = None
+    # 导购工号（导购身份标识; 开关与 mock 用户列表见 guide_auth 配置段）
+    guide_num: str = Field(min_length=1)
+    # 顾客信息必传：union_id 用于 session_id 生成，其余字段按需传入
+    customer: SalesPitchCustomerInfo
     # 至少 1 个商品；上限防御由路由层校验
     products: List[SalesPitchProductInfo] = Field(min_length=1, max_length=10)
     # 话术风格：warm(热情亲切)/professional(专业顾问)/concise(简短干练)或自由描述
@@ -133,7 +141,7 @@ class SalesPitchRequest(BaseModel):
     # 话术字数上限（0 或缺失表示不限）
     max_length: Optional[int] = None
 
-    @field_validator("pitch_style", "channel", mode="after")
+    @field_validator("pitch_style", "channel", "guide_num", mode="after")
     @classmethod
     def _strip_text(cls, v: object) -> object:
         return v.strip() if isinstance(v, str) else v

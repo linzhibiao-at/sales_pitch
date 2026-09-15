@@ -25,7 +25,12 @@ from backend.services.sales_pitch_service import (
 
 class SalesPitchRequestValidationTest(unittest.TestCase):
     def _base(self, **overrides) -> dict:
-        payload = {"app_id": "micro_guide", "products": [{"title": "FILA 卫衣"}]}
+        payload = {
+            "app_id": "micro_guide",
+            "guide_num": "G001",
+            "customer": {"union_id": "U_test123"},
+            "products": [{"title": "FILA 卫衣"}],
+        }
         payload.update(overrides)
         return payload
 
@@ -57,9 +62,19 @@ class SalesPitchRequestValidationTest(unittest.TestCase):
         self.assertEqual(req.pitch_style, "warm")
         self.assertEqual(req.channel, "wechat")
 
+    def test_guide_num_required(self) -> None:
+        """guide_num 必传: 不传报 422。"""
+        payload = {"app_id": "micro_guide", "customer": {"union_id": "U1"}, "products": [{"title": "t"}]}
+        with self.assertRaises(ValidationError):
+            SalesPitchRequest(**payload)
+
+    def test_guide_num_stripped(self) -> None:
+        req = SalesPitchRequest(**self._base(guide_num=" G001 "))
+        self.assertEqual(req.guide_num, "G001")
+
     def test_html_tags_stripped_in_free_text(self) -> None:
         req = SalesPitchRequest(**self._base(
-            customer={"notes": "<script>alert(1)</script>关注面料舒适度"},
+            customer={"union_id": "U1", "notes": "<script>alert(1)</script>关注面料舒适度"},
             products=[{"title": "卫衣<b>经典</b>", "selling_points": "纯棉<i>透气</i>"}],
         ))
         assert req.customer is not None
@@ -76,9 +91,18 @@ class SalesPitchRequestValidationTest(unittest.TestCase):
         p = SalesPitchProductInfo(title="卫衣\ud800")
         self.assertEqual(p.title, "卫衣")
 
-    def test_customer_optional(self) -> None:
-        req = SalesPitchRequest(**self._base())
-        self.assertIsNone(req.customer)
+    def test_customer_required(self) -> None:
+        """customer 必传: 不传报 422。"""
+        payload = {"app_id": "micro_guide", "guide_num": "G001", "products": [{"title": "t"}]}
+        with self.assertRaises(ValidationError):
+            SalesPitchRequest(**payload)
+
+    def test_customer_union_id_required(self) -> None:
+        """customer.union_id 必传: 缺失或空字符串报 422。"""
+        with self.assertRaises(ValidationError):
+            SalesPitchRequest(**self._base(customer={}))
+        with self.assertRaises(ValidationError):
+            SalesPitchRequest(**self._base(customer={"union_id": ""}))
 
 
 # ── prompt 文本块构建（纯函数）────────────────────────────────
@@ -87,7 +111,7 @@ class SalesPitchRequestValidationTest(unittest.TestCase):
 class BuildCustomerBlockTest(unittest.TestCase):
     def test_full_fields_and_extra(self) -> None:
         c = SalesPitchCustomerInfo(
-            nickname="王女士", gender="女", age="35",
+            union_id="U_full", nickname="王女士", gender="女", age="35",
             style_preference="简约通勤", scene="秋季通勤",
             notes="怕冷，关注面料", extra={"会员等级": "VIP"},
         )
@@ -103,10 +127,10 @@ class BuildCustomerBlockTest(unittest.TestCase):
         self.assertEqual(build_customer_block(None), "")
 
     def test_all_fields_empty(self) -> None:
-        self.assertEqual(build_customer_block(SalesPitchCustomerInfo()), "")
+        self.assertEqual(build_customer_block(SalesPitchCustomerInfo(union_id="U1")), "")
 
     def test_extra_non_str_value_jsonified(self) -> None:
-        c = SalesPitchCustomerInfo(extra={"历史购买": ["卫衣", "运动鞋"]})
+        c = SalesPitchCustomerInfo(union_id="U1", extra={"历史购买": ["卫衣", "运动鞋"]})
         b = build_customer_block(c)
         self.assertIn("历史购买: [\"卫衣\", \"运动鞋\"]", b)
 
@@ -150,6 +174,8 @@ class BuildRequirementsBlockTest(unittest.TestCase):
     def _req(self, **overrides) -> SalesPitchRequest:
         payload = {
             "app_id": "micro_guide",
+            "guide_num": "G001",
+            "customer": {"union_id": "U1"},
             "products": [{"title": "t"}],
         }
         payload.update(overrides)
@@ -235,8 +261,8 @@ def _make_svc(agent_response: str = "", *, agent_error: Exception | None = None)
 def _req(**overrides) -> SalesPitchRequest:
     payload = {
         "app_id": "micro_guide",
-        "session_id": "sid-1",
-        "customer": {"nickname": "王女士", "scene": "秋季通勤"},
+        "guide_num": "G001",
+        "customer": {"union_id": "U_abc", "nickname": "王女士", "scene": "秋季通勤"},
         "products": [{
             "sku_id": "U2D240211", "title": "FILA 经典卫衣",
             "price": 399, "selling_points": "重磅面料",
@@ -257,13 +283,14 @@ class SalesPitchServiceGenerateTest(unittest.TestCase):
         ))
         self.assertNotIn("error", out)
         self.assertEqual(out["pitch"], "王女士，这件卫衣非常适合您的秋季通勤~")
-        self.assertEqual(out["session_id"], "sid-1")
+        # session_id = {guide_num}_{union_id}
+        self.assertEqual(out["session_id"], "G001_U_abc")
         self.assertEqual(out["pitch_style"], "warm")
         self.assertIsInstance(out["model"], str)
-        # Agent 被调用一次，thread_id 映射到 session_id
+        # Agent 被调用一次，thread_id 映射到确定性 session_id
         self.assertEqual(mock_agent.call_count, 1)
         self.assertEqual(
-            mock_agent.last_config, {"configurable": {"thread_id": "sid-1"}},
+            mock_agent.last_config, {"configurable": {"thread_id": "G001_U_abc"}},
         )
         # 用户消息包含三个文本块
         user_msg = mock_agent.last_input["messages"][0]["content"]
@@ -276,6 +303,7 @@ class SalesPitchServiceGenerateTest(unittest.TestCase):
         self.assertEqual(doc["request_kind"], "sales_pitch")
         self.assertEqual(doc["status"], "ok")
         self.assertEqual(doc["trace_id"], "tid")
+        self.assertEqual(doc["input"]["guide_num"], "G001")
         self.assertEqual(doc["input"]["customer"]["nickname"], "王女士")
         self.assertEqual(doc["input"]["products"][0]["title"], "FILA 经典卫衣")
         self.assertEqual(doc["result"]["pitch"], out["pitch"])
@@ -302,14 +330,36 @@ class SalesPitchServiceGenerateTest(unittest.TestCase):
         asyncio.run(svc.generate(_req(), trace_id="tid"))
         self.assertEqual(svc._audit.docs, [])
 
-    def test_no_customer_still_works(self) -> None:
+    def test_audit_guide_num_always_present(self) -> None:
+        """guide_num 必传: 审计记录始终存在。"""
+        svc, _ = _make_svc("话术")
+        asyncio.run(svc.generate(_req(), trace_id="tid"))
+        doc = svc._audit.docs[0]
+        self.assertEqual(doc["input"]["guide_num"], "G001")
+
+    def test_session_id_deterministic(self) -> None:
+        """相同 guide_num + union_id → 相同 session_id。"""
+        svc1, agent1 = _make_svc("话术")
+        asyncio.run(svc1.generate(_req(), trace_id="t1"))
+        svc2, agent2 = _make_svc("话术")
+        asyncio.run(svc2.generate(_req(), trace_id="t2"))
+        self.assertEqual(
+            agent1.last_config, agent2.last_config,
+        )
+        self.assertEqual(
+            agent1.last_config["configurable"]["thread_id"], "G001_U_abc",
+        )
+
+    def test_minimal_customer_still_works(self) -> None:
+        """customer 仅含 union_id 时仍可生成。"""
         svc, mock_agent = _make_svc("通用话术")
         out = asyncio.run(svc.generate(
-            _req(customer=None), trace_id="tid",
+            _req(customer={"union_id": "U_minimal"}), trace_id="tid",
         ))
+        self.assertEqual(out["session_id"], "G001_U_minimal")
         self.assertEqual(out["pitch"], "通用话术")
         user_msg = mock_agent.last_input["messages"][0]["content"]
-        self.assertNotIn("【顾客信息】", user_msg)
+        self.assertNotIn("称呼:", user_msg)
 
 
 # ── 审计文档构建（纯函数）────────────────────────────────────

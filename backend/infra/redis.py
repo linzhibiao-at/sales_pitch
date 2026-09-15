@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 NAMESPACE: tuple[str, ...] = ("fileSystem",)
 
 
-def init_redis() -> Tuple[Any, Any, Any, Any]:
-    """初始化 Redis 连接、checkpointer、store、store_backend。
+async def init_redis() -> Tuple[Any, Any, Any, Any]:
+    """异步初始化 Redis 连接、checkpointer、store、store_backend。
 
     Returns:
         (redis_client, checkpointer, store, store_backend)
@@ -28,7 +28,8 @@ def init_redis() -> Tuple[Any, Any, Any, Any]:
         ConnectionError: Redis 不可达时向上抛出，由调用方决定是否降级。
     """
     import redis
-    from langgraph.checkpoint.redis import RedisSaver
+    import redis.asyncio as aioredis
+    from langgraph.checkpoint.redis import AsyncRedisSaver
     from langgraph.store.redis import RedisStore
     from deepagents.backends import StoreBackend
 
@@ -37,14 +38,17 @@ def init_redis() -> Tuple[Any, Any, Any, Any]:
     db = get_redis_db()
     logger.info("[infra] Redis 连接 %s:%s/%s", host, port, db)
 
+    # 同步客户端用于 store（RedisStore 暂无 async 变体）
     redis_client = redis.Redis(host=host, port=port, db=db)
-    # 验证连通性
     redis_client.ping()
 
-    checkpointer = RedisSaver(
-        redis_client=redis_client, checkpoint_prefix="sp_checkpointer",
+    # 异步客户端用于 checkpointer（ainvoke 需要 async get/put）
+    async_redis = aioredis.Redis(host=host, port=port, db=db)
+
+    checkpointer = AsyncRedisSaver(
+        redis_client=async_redis, checkpoint_prefix="sp_checkpointer",
     )
-    checkpointer.setup()
+    await checkpointer.setup()
 
     store = RedisStore(conn=redis_client, store_prefix="sp_store")
     store.setup()
@@ -53,5 +57,5 @@ def init_redis() -> Tuple[Any, Any, Any, Any]:
         store=store, namespace=lambda _rt: NAMESPACE,
     )
 
-    logger.info("[infra] Redis checkpointer + store 初始化完成")
+    logger.info("[infra] Redis checkpointer(async) + store 初始化完成")
     return redis_client, checkpointer, store, store_backend

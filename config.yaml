@@ -24,6 +24,21 @@ auth:
     default_queue_size: 20      # 默认排队队列容量
     default_queue_timeout: 30   # 默认排队超时(秒)
 
+# 导购身份校验（用户级, 与上面 auth 应用级鉴权互补）
+# enabled=true 时对外 B2B 接口请求体须携带有效 guide_num（存在于下方 users
+# 列表）: 缺失 400 / 未知 401。users 为 mock 用户列表, 暂代数据库 user 表
+# （后续替换为 MySQL user 表查询）; 生产灰度可改 false 回退旧行为(不校验),
+# 修改后热生效(无需重启)。
+guide_auth:
+  enabled: false
+  users:
+    - guide_num: "G001"
+      name: "测试导购一"
+    - guide_num: "G002"
+      name: "测试导购二"
+    - guide_num: "2022091656"
+      name: "标"
+
 paths:
   logs_dir: "data/logs"
 
@@ -37,7 +52,7 @@ models:
   sales_pitch_llm:
     primary:
       provider: dashscope
-      model: "qwen3.8-27b"
+      model: "qwen-plus"
       api_key_env: "sk-33d77aea509749c4909d8fb5e8afddff"
       base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       max_tokens: 2048
@@ -64,7 +79,7 @@ redis:
 # MySQL：请求审计落库（环境变量 MYSQL_URL 可覆盖连接串）
 # url 为空时不建连接，审计写/查静默降级；启动时自动建表 request_audit
 mysql:
-  url: "mysql+pymysql://root:123456@host:3306/fila_sales_pitch?charset=utf8mb4"   # 例：mysql+pymysql://user:pass@host:3306/fila_sales_pitch?charset=utf8mb4
+  url: "mysql+pymysql://root:123456@localhost:3306/fila_sales_pitch?charset=utf8mb4"   # 例：mysql+pymysql://user:pass@localhost:3306/fila_sales_pitch?charset=utf8mb4
   table: "request_audit"
 
 # 对外请求审计开关：false 时既不写也不查（查询 API 返空/503）
