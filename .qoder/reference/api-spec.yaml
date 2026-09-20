@@ -1,4 +1,4 @@
-x-last-updated: 2026-09-01
+x-last-updated: 2026-09-18
 x-status: active
 x-owner: '@linzhibiao'
 openapi: 3.0.3
@@ -115,10 +115,10 @@ components:
   schemas:
     SalesPitchRequest:
       type: object
-      required: [app_id, products]
+      required: [app_id, guide_num, customer, products]
       properties:
         app_id: {type: string, description: 调用方标识，须在 allowed_app_ids 白名单内且与 Key 绑定一致}
-        session_id: {type: string, description: 缺省由服务生成并随响应返回；同值续传即多轮对话}
+        guide_num: {type: string, minLength: 1, description: 导购工号（导购身份标识，必传）；开关与白名单见 guide_auth 配置段}
         customer:
             $ref: '#/components/schemas/SalesPitchCustomerInfo'
         products:
@@ -127,35 +127,48 @@ components:
           maxItems: 10
           items:
             $ref: '#/components/schemas/SalesPitchProductInfo'
-        pitch_style: {type: string, description: warm | professional | concise 或自由描述（如"小红书种草风"）}
-        channel: {type: string, description: wechat | offline | phone | live 或自由描述}
+        promotions:
+          type: array
+          maxItems: 10
+          description: 门店已选活动（可选）；非空时注入【促销活动】块，缺省或空数组均不注入
+          items:
+            $ref: '#/components/schemas/SalesPitchPromotionInfo'
+        coupon_names:
+          type: array
+          maxItems: 20
+          description: "已核验且已选的顾客券名（可选）：非空注入【顾客优惠券】块；显式空数组（或清理后为空）触发“会员专属优惠”兜底；缺省不注入且无兜底（与空数组语义不同）"
+          items: {type: string, description: 单项清理后 ≤100 字符；清理后为空的项被剔除}
+        pitch_style: {type: string, description: warm | professional | concise（预设）或四档语气：亲切自然 | 活力潮流 | 专业尊贵 | 简约高效；其余自由描述原样透传}
         max_length: {type: integer, minimum: 0, description: 话术字数上限（0 或缺省不限）}
+        extra_prompt: {type: string, maxLength: 500, description: 导购自由补充要求（可选）；非空时作为【补充要求】块注入 prompt，空值不注入}
       description: 入参经 Pydantic 清理（HTML 标签剥除 + lone surrogate 剔除）
     SalesPitchCustomerInfo:
       type: object
-      description: 顾客画像，全部可选；未提供的维度不注入 prompt
+      required: [union_id]
+      description: 顾客画像；union_id 必传（用于确定性生成 session_id），其余字段按需传入；未提供的维度不注入 prompt
       properties:
+        union_id: {type: string, description: 会员标识（必传）：微信 unionid 等平台标识，用于确定性生成 session_id}
         nickname: {type: string, description: 顾客称呼，如"王女士"}
         gender: {type: string}
         age: {type: string, description: 年龄段或具体年龄，如"35""大学生"}
-        style_preference: {type: string, description: 如"简约通勤"}
-        scene: {type: string, description: 使用/穿着场景，如"秋季通勤"}
-        size_info: {type: string, description: 尺码/身材，如"M 码""173cm/60kg"}
-        budget: {type: string, description: 预算范围，如"500-800元"}
-        notes: {type: string, description: 导购补录的顾客关注点/历史消费备注}
+        member_level: {type: string, description: 会员等级，如"金卡会员"}
+        points: {type: integer, minimum: 0, description: 会员积分（非负）}
         extra: {type: object, additionalProperties: true, description: 扩展字段，以"字段名→值"原样注入 prompt}
     SalesPitchProductInfo:
       type: object
       required: [title]
       properties:
-        sku_id: {type: string}
         title: {type: string, description: 商品名称（清理后须非空）}
-        price: {type: number}
-        category: {type: string, description: 如"卫衣""运动鞋"}
         color: {type: string}
-        material: {type: string}
-        selling_points: {type: string, description: 卖点，逗号或分号分隔}
         extra: {type: object, additionalProperties: true}
+    SalesPitchPromotionInfo:
+      type: object
+      required: [promo_id, copy]
+      description: 门店已选活动（POS 促销）；promo_id 仅供审计溯源，不注入提示词
+      properties:
+        promo_id: {type: string, description: 活动标识（清理后须非空）}
+        name: {type: string, description: 活动名（可选），作为 prompt 行前缀}
+        copy: {type: string, description: 活动展示文案（清理后须非空）；话术仅可引用该原文，禁止编造}
     SalesPitchResponse:
       type: object
       properties:
@@ -209,7 +222,7 @@ components:
         elapsed_ms: {type: integer}
         status: {type: string}
         error: {type: string, nullable: true}
-        input: {type: object, description: 入参快照（session_id/customer/products/pitch_style/channel/max_length）}
+        input: {type: object, description: "入参快照（session_id/guide_num/customer/products/promotions/coupon_names/pitch_style/max_length/extra_prompt；promotions 为 promo_id/name/copy 结构（by_alias），coupon_names 区分缺省 null 与显式 []）"}
         intent: {type: string, nullable: true, description: 历史字段，恒 null}
         recall: {type: string, nullable: true, description: 历史字段，恒 null}
         ranking: {type: string, nullable: true, description: 历史字段，恒 null}

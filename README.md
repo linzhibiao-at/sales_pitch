@@ -8,7 +8,7 @@
 
 | 能力 | 接口 | 说明 |
 | --- | --- | --- |
-| 话术生成 | `POST /v1/sales-pitch/generate` | 顾客信息 + 商品清单 → 导购话术（支持风格/渠道/字数要求） |
+| 话术生成 | `POST /v1/sales-pitch/generate` | 顾客信息 + 商品清单 → 导购话术（支持风格/字数要求） |
 | 健康检查 | `GET /health` | 探活（K8s liveness/readiness） |
 | 审计列表 | `GET /api/audit/requests` | 按 trace_id/app_id/时间等过滤请求审计 |
 | 审计详情 | `GET /api/audit/requests/{trace_id}` | 单条审计完整文档（输入/结果） |
@@ -97,44 +97,72 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8080
 
 ```json
 {
-  "session_id": "可选，幂等/联调追踪用",
   "app_id": "micro_guide",
+  "guide_num": "G001",
   "customer": {
+    "union_id": "U_abc123",
     "nickname": "王女士",
     "gender": "女",
     "age": "35",
-    "style_preference": "简约通勤",
-    "scene": "秋季通勤",
-    "size_info": "M 码",
-    "budget": "500-800元",
-    "notes": "关注面料舒适度",
-    "extra": {"会员等级": "金卡"}
+    "member_level": "金卡会员",
+    "points": 1260,
+    "extra": {}
   },
   "products": [
     {
-      "sku_id": "F11W619219FPK",
       "title": "FILA 重磅纯棉连帽卫衣",
-      "price": 599,
-      "category": "卫衣",
       "color": "燕麦色",
-      "material": "纯棉",
-      "selling_points": "重磅面料；不变形；经典LOGO",
+      "extra": {}
+    },
+    {
+      "title": "FILA 经典直筒休闲裤",
       "extra": {}
     }
   ],
-  "pitch_style": "warm",
-  "channel": "wechat",
-  "max_length": 200
+  "promotions": [
+    {
+      "promo_id": "mixian",
+      "name": "万象城1000-200",
+      "copy": "现在万象城有【部分整单满减】满1000减200，这套一起买刚好能用上。"
+    }
+  ],
+  "coupon_names": ["500元生日券", "FUSION38元专属鞋券"],
+  "pitch_style": "亲切自然",
+  "max_length": 200,
+  "extra_prompt": "突出秋冬新品，提醒会员双倍积分"
 }
 ```
 
 字段说明：
 
-- `customer` 整体可选（缺省生成通用话术）；`extra` 为自由扩展字段，原样注入 prompt
-- `products` 1~10 个；`title` 必填（清理 HTML 标签/lone surrogate 后须非空）
-- `pitch_style`：`warm`（热情亲切）/ `professional`（专业顾问）/ `concise`（简短干练）或自由描述
-- `channel`：`wechat` / `offline` / `phone` / `live` 或自由描述，影响排版与语气
+- `guide_num` 必填（导购工号）；`customer` 必传，`union_id` 必填（生成会话 ID 用）；`extra` 为自由扩展字段，原样注入 prompt
+- `customer.member_level` / `customer.points`：会员等级与积分（可选）；积分须 ≥0；以「会员等级」「积分」行注入【顾客信息】
+- `products` 1~10 个；`title` 必填（清理 HTML 标签/lone surrogate 后须非空）；数组中第 1 件为主款
+- `promotions`：门店 POS 已选活动（可选，≤10 项），`{promo_id, name?, copy}`；`copy` 展示文案必填，话术仅可引用原文；`promo_id` 仅记审计、不注入提示词
+- `coupon_names`：已核验且已选的顾客券名（可选，≤20 项、单项 ≤100 字）；**缺省与空数组语义不同**——缺省不注入；显式 `[]`（或清理后为空）注入"会员专属优惠"兜底指示（微导购端无券时请传 `[]`）
+- `pitch_style`：`warm`（热情亲切）/ `professional`（专业顾问）/ `concise`（简短干练），或四档语气 `亲切自然` / `活力潮流` / `专业尊贵` / `简约高效`，或自由描述
+- `extra_prompt`：导购自由补充要求（可选，≤500 字符），非空时作为【补充要求】块注入；与风格/字数平级，由模型自行权衡
 - 入参自由文本自动剥除 HTML 标签（防 LLM 内容过滤）与非法 surrogate 码点
+
+**换一换（AI 文案改写）**：同一 `guide_num` + `customer.union_id` 即同一会话（多轮历史自动衔接），复用本接口重发并将修改原因与补充说明拼入 `extra_prompt`：
+
+```text
+换一换修改要求：优惠/会员权益没体现；没引导到店/行动
+补充说明：结尾再热情一点，提一下到店试穿
+```
+
+修改原因对应工作台四个选项（可多选）：优惠/会员权益没体现、信息有误（券/活动/价格/货号等）、语气不对、没引导到店/行动。
+
+**PRD 6.6「AI 文案」字段映射**（微导购邀约工作台）：
+
+| PRD 字段 | 本接口字段 | 说明 |
+| --- | --- | --- |
+| `memberId` | `customer.union_id` | 必传 |
+| `productIds` | `products[]`（商品对象：title/color） | 服务端无商品库，按对象数组传全量 |
+| `promoIds` | `promotions[].promo_id` | 需同时传 `copy` 展示文案 |
+| `couponNames` | `coupon_names` | 无券传 `[]` 触发兜底 |
+| `tone` | `pitch_style` | 四档语气取值 |
+| `rewriteReasons` / `rewriteNote` | `extra_prompt` | 拼接模板见上 |
 
 **响应**：
 

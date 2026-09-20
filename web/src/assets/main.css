@@ -77,6 +77,8 @@ a { color: inherit; text-decoration: none; }
 .badge-blue { background: #e3f2fd; color: #1565c0; }
 .badge-green { background: #e8f5e9; color: #2e7d32; }
 .badge-orange { background: #fff3e0; color: #e65100; }
+.badge-teal { background: #e0f2f1; color: #00695c; }
+.badge-gray { background: #eceff1; color: #546e7a; }
 
 /* 加载指示 */
 .spinner {

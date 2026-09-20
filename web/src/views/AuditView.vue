@@ -135,6 +135,18 @@
             <span class="detail-label">商品信息</span>
             <pre class="detail-pre">{{ JSON.stringify(detailItem.input?.products ?? null, null, 2) }}</pre>
           </div>
+          <div class="detail-section">
+            <span class="detail-label">促销活动</span>
+            <pre class="detail-pre">{{ JSON.stringify(detailItem.input?.promotions ?? null, null, 2) }}</pre>
+          </div>
+          <div class="detail-section">
+            <span class="detail-label">优惠券</span>
+            <pre class="detail-pre">{{ JSON.stringify(detailItem.input?.coupon_names ?? null, null, 2) }}</pre>
+          </div>
+          <div class="detail-section">
+            <span class="detail-label">补充要求</span>
+            <pre class="detail-pre">{{ detailItem.input?.extra_prompt || '—' }}</pre>
+          </div>
           </template>
         </div>
       </div>
@@ -209,6 +221,7 @@ function truncate(str, len) {
   if (!str) return '—'
   return str.length > len ? str.slice(0, len) + '…' : str
 }
+
 </script>
 
 <style scoped>

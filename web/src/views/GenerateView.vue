@@ -11,6 +11,21 @@
     <div class="page-body">
       <!-- 左列：表单 -->
       <div class="form-col">
+        <!-- 导购信息 -->
+        <div class="card section-card">
+          <div class="section-header">
+            <span class="section-icon">🧑💼</span>
+            <h2>导购信息</h2>
+            <span class="hint">（必填）</span>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label>导购工号 (guide_num) <span class="required">*</span></label>
+              <input v-model="form.guide_num" class="form-input" placeholder="如：G001" />
+            </div>
+          </div>
+        </div>
+
         <!-- 顾客信息 -->
         <div class="card section-card">
           <div class="section-header">
@@ -22,10 +37,6 @@
             <div class="form-group">
               <label>会员标识 (union_id) <span class="required">*</span></label>
               <input v-model="form.customer.union_id" class="form-input" placeholder="如：微信 unionid" />
-            </div>
-            <div class="form-group">
-              <label>导购工号 (guide_num) <span class="required">*</span></label>
-              <input v-model="form.guide_num" class="form-input" placeholder="如：G001" />
             </div>
             <div class="form-group">
               <label>称呼</label>
@@ -44,24 +55,12 @@
               <input v-model="form.customer.age" class="form-input" placeholder="如：35 / 大学生" />
             </div>
             <div class="form-group">
-              <label>尺码 / 身材</label>
-              <input v-model="form.customer.size_info" class="form-input" placeholder="如：M码 / 173cm 60kg" />
+              <label>会员等级</label>
+              <input v-model="form.customer.member_level" class="form-input" placeholder="如：金卡会员" />
             </div>
             <div class="form-group">
-              <label>风格偏好</label>
-              <input v-model="form.customer.style_preference" class="form-input" placeholder="如：简约通勤、复古运动" />
-            </div>
-            <div class="form-group">
-              <label>使用场景</label>
-              <input v-model="form.customer.scene" class="form-input" placeholder="如：秋季通勤、周末出游" />
-            </div>
-            <div class="form-group">
-              <label>预算范围</label>
-              <input v-model="form.customer.budget" class="form-input" placeholder="如：500-800元" />
-            </div>
-            <div class="form-group">
-              <label>导购备注</label>
-              <input v-model="form.customer.notes" class="form-input" placeholder="关注点、历史消费备注" />
+              <label>积分</label>
+              <input v-model.number="form.customer.points" type="number" min="0" class="form-input" placeholder="如：1200" />
             </div>
           </div>
         </div>
@@ -71,6 +70,7 @@
           <div class="section-header">
             <span class="section-icon">👗</span>
             <h2>商品信息</h2>
+            <span class="hint">（多件时第一件为主款）</span>
             <button class="btn btn-secondary btn-sm" @click="addProduct" :disabled="form.products.length >= 10">
               + 添加商品
             </button>
@@ -81,7 +81,10 @@
             class="product-block"
           >
             <div class="product-block-header">
-              <span class="product-index">商品 {{ idx + 1 }}</span>
+              <span class="product-index">
+                商品 {{ idx + 1 }}
+                <span v-if="idx === 0 && form.products.length > 1" class="badge badge-blue">主款</span>
+              </span>
               <button
                 v-if="form.products.length > 1"
                 class="btn btn-danger btn-sm"
@@ -94,31 +97,79 @@
                 <input v-model="p.title" class="form-input" placeholder="如：FILA 经典卫衣" />
               </div>
               <div class="form-group">
-                <label>SKU ID</label>
-                <input v-model="p.sku_id" class="form-input" placeholder="如：U2D240211" />
-              </div>
-              <div class="form-group">
-                <label>价格（元）</label>
-                <input v-model.number="p.price" type="number" class="form-input" placeholder="如：399" />
-              </div>
-              <div class="form-group">
-                <label>类目</label>
-                <input v-model="p.category" class="form-input" placeholder="如：卫衣、运动鞋" />
-              </div>
-              <div class="form-group">
                 <label>颜色</label>
                 <input v-model="p.color" class="form-input" placeholder="如：黑色、米白" />
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 促销与优惠 -->
+        <div class="card section-card">
+          <div class="section-header">
+            <span class="section-icon">🎁</span>
+            <h2>促销与优惠</h2>
+            <span class="hint">（选填）</span>
+            <button class="btn btn-secondary btn-sm" @click="addPromotion" :disabled="form.promotions.length >= 10">
+              + 添加活动
+            </button>
+          </div>
+
+          <div v-if="!form.promotions.length" class="block-empty">
+            暂无门店活动；如有 POS 活动可点击「+ 添加活动」，话术将引用活动文案原文
+          </div>
+
+          <div
+            v-for="(pr, idx) in form.promotions"
+            :key="idx"
+            class="product-block"
+          >
+            <div class="product-block-header">
+              <span class="product-index">活动 {{ idx + 1 }}</span>
+              <button class="btn btn-danger btn-sm" @click="removePromotion(idx)">移除</button>
+            </div>
+            <div class="form-grid-2">
               <div class="form-group">
-                <label>材质</label>
-                <input v-model="p.material" class="form-input" placeholder="如：纯棉、聚酯纤维" />
+                <label>活动 ID (promo_id) <span class="required">*</span></label>
+                <input v-model="pr.promo_id" class="form-input" placeholder="如：P20260901" />
+              </div>
+              <div class="form-group">
+                <label>活动名称</label>
+                <input v-model="pr.name" class="form-input" placeholder="如：秋尚新满减" />
               </div>
             </div>
             <div class="form-group" style="margin-top:10px">
-              <label>卖点描述</label>
-              <textarea v-model="p.selling_points" class="form-textarea" placeholder="面料、工艺、功能等，用分号分隔" rows="2" />
+              <label>活动文案 (copy) <span class="required">*</span></label>
+              <textarea v-model="pr.copy" class="form-textarea" placeholder="如：满1000减200；话术仅引用该文案原文" rows="2" />
+              <span
+                v-if="(pr.promo_id.trim() || pr.copy.trim()) && !(pr.promo_id.trim() && pr.copy.trim())"
+                class="field-warn"
+              >
+                活动 ID 与文案均填写后，该活动才会随请求提交
+              </span>
             </div>
           </div>
+
+          <div class="sub-divider" />
+
+          <div class="form-group">
+            <label>顾客优惠券</label>
+            <textarea
+              v-model="form.coupon_text"
+              class="form-textarea"
+              :disabled="form.no_coupon"
+              placeholder="多个券名用逗号或换行分隔，如：满500减100、会员9折（最多 20 张）"
+              rows="2"
+            />
+          </div>
+          <label class="check-line">
+            <input type="checkbox" v-model="form.no_coupon" />
+            <span>顾客暂无可用券（话术使用「会员专属优惠」兜底表述）</span>
+          </label>
+          <p v-if="form.no_coupon && form.coupon_text.trim()" class="field-warn">
+            已勾选「暂无可用券」，上方输入的券名不会被提交
+          </p>
+          <p class="field-hint">不填且不勾选时，话术不会提及优惠券</p>
         </div>
 
         <!-- 话术要求 -->
@@ -127,29 +178,37 @@
             <span class="section-icon">🎯</span>
             <h2>话术要求</h2>
           </div>
-          <div class="form-grid-3">
+          <div class="form-grid-2">
             <div class="form-group">
               <label>话术风格</label>
               <select v-model="form.pitch_style" class="form-select">
                 <option value="">不限</option>
-                <option value="warm">热情亲切（warm）</option>
-                <option value="professional">专业顾问（professional）</option>
-                <option value="concise">简短干练（concise）</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>触达渠道</label>
-              <select v-model="form.channel" class="form-select">
-                <option value="">不限</option>
-                <option value="wechat">微信</option>
-                <option value="offline">线下</option>
-                <option value="phone">电话</option>
+                <optgroup label="邀约工作台语气">
+                  <option value="亲切自然">亲切自然</option>
+                  <option value="活力潮流">活力潮流</option>
+                  <option value="专业尊贵">专业尊贵</option>
+                  <option value="简约高效">简约高效</option>
+                </optgroup>
+                <optgroup label="兼容预设">
+                  <option value="warm">热情亲切（warm）</option>
+                  <option value="professional">专业顾问（professional）</option>
+                  <option value="concise">简短干练（concise）</option>
+                </optgroup>
               </select>
             </div>
             <div class="form-group">
               <label>字数上限</label>
               <input v-model.number="form.max_length" type="number" class="form-input" placeholder="0 = 不限" min="0" />
             </div>
+          </div>
+          <div class="form-group">
+            <label>补充要求（可选）</label>
+            <textarea
+              v-model="form.extra_prompt"
+              class="form-textarea"
+              placeholder="如：突出秋冬新品／在上一版基础上再活泼一些"
+              rows="2"
+            />
           </div>
         </div>
 
@@ -183,8 +242,12 @@
                 <div class="msg-body user-body">
                   <div class="msg-meta">
                     <span v-if="item.req.customer?.nickname" class="badge badge-blue">{{ item.req.customer.nickname }}</span>
-                    <span v-for="p in item.req.products" :key="p.sku_id || p.title" class="badge badge-orange">{{ p.title }}</span>
+                    <span v-for="p in item.req.products" :key="p.title" class="badge badge-orange">{{ p.title }}</span>
                     <span v-if="item.req.pitch_style" class="badge badge-green">{{ item.req.pitch_style }}</span>
+                    <span v-if="item.req.promotions?.length" class="badge badge-teal">活动×{{ item.req.promotions.length }}</span>
+                    <span v-if="item.req.coupon_names" class="badge badge-gray">
+                      {{ item.req.coupon_names.length ? `券×${item.req.coupon_names.length}` : '无券' }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -219,20 +282,24 @@ import { generatePitch } from '@/api/index.js'
 
 // ── 表单状态 ──────────────────────────────────────────────
 const defaultProduct = () => ({
-  title: '', sku_id: '', price: null, category: '',
-  color: '', material: '', selling_points: '',
+  title: '', color: '',
 })
+
+const defaultPromotion = () => ({ promo_id: '', name: '', copy: '' })
 
 const form = ref({
   guide_num: localStorage.getItem('sp_guide_num') || '',
   customer: {
-    union_id: '', nickname: '', gender: '', age: '', size_info: '',
-    style_preference: '', scene: '', budget: '', notes: '',
+    union_id: '', nickname: '', gender: '', age: '',
+    member_level: '', points: null,
   },
   products: [defaultProduct()],
-  pitch_style: 'warm',
-  channel: 'wechat',
+  promotions: [],
+  pitch_style: '亲切自然',
   max_length: 120,
+  coupon_text: '',
+  no_coupon: false,
+  extra_prompt: '',
 })
 
 const canSubmit = computed(() =>
@@ -246,6 +313,12 @@ function addProduct() {
 }
 function removeProduct(idx) {
   form.value.products.splice(idx, 1)
+}
+function addPromotion() {
+  if (form.value.promotions.length < 10) form.value.promotions.push(defaultPromotion())
+}
+function removePromotion(idx) {
+  form.value.promotions.splice(idx, 1)
 }
 
 // ── 会话状态 ──────────────────────────────────────────────
@@ -273,14 +346,26 @@ async function doGenerate() {
     .filter(p => p.title.trim())
     .map(p => {
       const obj = { title: p.title.trim() }
-      if (p.sku_id) obj.sku_id = p.sku_id
-      if (p.price !== null && p.price !== '') obj.price = p.price
-      if (p.category) obj.category = p.category
       if (p.color) obj.color = p.color
-      if (p.material) obj.material = p.material
-      if (p.selling_points) obj.selling_points = p.selling_points
       return obj
     })
+  // 促销活动：仅提交 promo_id 与 copy 均已填写的行（缺文案的行后端会 422）
+  const promotions = form.value.promotions
+    .filter(pr => pr.promo_id.trim() && pr.copy.trim())
+    .map(pr => {
+      const obj = { promo_id: pr.promo_id.trim(), copy: pr.copy.trim() }
+      if (pr.name.trim()) obj.name = pr.name.trim()
+      return obj
+    })
+  // 优惠券三态：勾选「暂无可用券」→ 显式空数组（触发会员权益兜底表述）；
+  // 有券名 → 数组；否则不传该字段（话术不涉及优惠券）
+  const couponNames = form.value.no_coupon
+    ? []
+    : form.value.coupon_text
+        .split(/[\n,，、;；]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .slice(0, 20)
 
   const payload = {
     app_id: appId,
@@ -288,12 +373,26 @@ async function doGenerate() {
     products,
     customer: customerRaw,
     ...(form.value.pitch_style && { pitch_style: form.value.pitch_style }),
-    ...(form.value.channel && { channel: form.value.channel }),
     ...(form.value.max_length > 0 && { max_length: form.value.max_length }),
+    ...(promotions.length ? { promotions } : {}),
+    ...(form.value.no_coupon || couponNames.length ? { coupon_names: couponNames } : {}),
+    ...(form.value.extra_prompt.trim() && { extra_prompt: form.value.extra_prompt.trim() }),
   }
 
-  // 添加 loading 占位条目
-  const entry = { req: { ...form.value, products }, loading: true, pitch: '', error: '', traceId: '' }
+  // 添加 loading 占位条目；req 为归一化快照（供请求摘要展示）
+  const entry = {
+    req: {
+      ...form.value,
+      customer: customerRaw,
+      products,
+      promotions,
+      coupon_names: payload.coupon_names,
+    },
+    loading: true,
+    pitch: '',
+    error: '',
+    traceId: '',
+  }
   history.value.push(entry)
   loading.value = true
 
@@ -394,6 +493,22 @@ function clearHistory() {
   justify-content: space-between;
 }
 .product-index { font-size: 13px; font-weight: 600; color: #1a73e8; }
+.product-index .badge { margin-left: 4px; }
+
+/* 促销与优惠 */
+.block-empty { font-size: 13px; color: #aaa; padding: 4px 0; }
+.sub-divider { border-top: 1px dashed #e4e8f0; }
+.field-warn { font-size: 12px; color: #c62828; }
+.field-hint { font-size: 12px; color: #aaa; }
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
+  cursor: pointer;
+}
+.check-line input { cursor: pointer; }
 
 .action-bar { display: flex; align-items: center; gap: 14px; }
 .hint-tip { font-size: 13px; color: #aaa; }
